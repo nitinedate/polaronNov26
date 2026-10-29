@@ -1,0 +1,12 @@
+{
+  "focused_tests_passed": 57,
+  "python_compile": "passed",
+  "yaml_files_validated": [
+    "docker-compose.yml",
+    "docker-compose.https.yml",
+    "services/mobile-android/docker-compose.yml",
+    "services/mobile-ios/docker-compose.yml",
+    "services/mobile-extract/docker-compose.yml"
+  ],
+  "docker_compose_runtime_validation": "not_run_docker_cli_unavailable"
+}

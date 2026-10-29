@@ -1,0 +1,16 @@
+{
+  "version": "V68",
+  "focused_tests": 33,
+  "additional_regression_tests": 27,
+  "total_passing_checks": 60,
+  "python_compileall": "passed",
+  "compose_yaml": {
+    "docker-compose.yml": "passed",
+    "services/mobile-android/docker-compose.yml": "passed",
+    "services/mobile-ios/docker-compose.yml": "passed",
+    "services/mobile-extract/docker-compose.yml": "passed"
+  },
+  "notes": [
+    "Some broader suites require runtime-only dependencies such as celery/psycopg2 and were not used for this local focused validation."
+  ]
+}

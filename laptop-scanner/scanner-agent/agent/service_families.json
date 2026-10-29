@@ -1,0 +1,210 @@
+[
+  {
+    "id": 1,
+    "name": "SMB_CIFS"
+  },
+  {
+    "id": 2,
+    "name": "RPC"
+  },
+  {
+    "id": 3,
+    "name": "WMI"
+  },
+  {
+    "id": 4,
+    "name": "WINRM"
+  },
+  {
+    "id": 5,
+    "name": "RDP"
+  },
+  {
+    "id": 6,
+    "name": "SSH_OPENSSH_DROPBEAR"
+  },
+  {
+    "id": 7,
+    "name": "FTP_FTPS"
+  },
+  {
+    "id": 8,
+    "name": "SFTP"
+  },
+  {
+    "id": 9,
+    "name": "HTTP"
+  },
+  {
+    "id": 10,
+    "name": "HTTPS_TLS"
+  },
+  {
+    "id": 11,
+    "name": "SMTP_SMTPS"
+  },
+  {
+    "id": 12,
+    "name": "POP3_POP3S"
+  },
+  {
+    "id": 13,
+    "name": "IMAP_IMAPS"
+  },
+  {
+    "id": 14,
+    "name": "DNS"
+  },
+  {
+    "id": 15,
+    "name": "SNMP"
+  },
+  {
+    "id": 16,
+    "name": "TELNET"
+  },
+  {
+    "id": 17,
+    "name": "TFTP"
+  },
+  {
+    "id": 18,
+    "name": "LDAP"
+  },
+  {
+    "id": 19,
+    "name": "LDAPS"
+  },
+  {
+    "id": 20,
+    "name": "KERBEROS"
+  },
+  {
+    "id": 21,
+    "name": "AD_GLOBAL_CATALOG"
+  },
+  {
+    "id": 22,
+    "name": "MSSQL"
+  },
+  {
+    "id": 23,
+    "name": "MYSQL_MARIADB"
+  },
+  {
+    "id": 24,
+    "name": "POSTGRESQL"
+  },
+  {
+    "id": 25,
+    "name": "ORACLE_DB"
+  },
+  {
+    "id": 26,
+    "name": "MONGODB"
+  },
+  {
+    "id": 27,
+    "name": "REDIS"
+  },
+  {
+    "id": 28,
+    "name": "ELASTICSEARCH"
+  },
+  {
+    "id": 29,
+    "name": "VNC"
+  },
+  {
+    "id": 30,
+    "name": "VMWARE_ESXI_VCENTER"
+  },
+  {
+    "id": 31,
+    "name": "DOCKER_API"
+  },
+  {
+    "id": 32,
+    "name": "KUBERNETES_API"
+  },
+  {
+    "id": 33,
+    "name": "KUBELET"
+  },
+  {
+    "id": 34,
+    "name": "JENKINS"
+  },
+  {
+    "id": 35,
+    "name": "GITLAB_GIT"
+  },
+  {
+    "id": 36,
+    "name": "RABBITMQ"
+  },
+  {
+    "id": 37,
+    "name": "KAFKA"
+  },
+  {
+    "id": 38,
+    "name": "MEMCACHED"
+  },
+  {
+    "id": 39,
+    "name": "TOMCAT"
+  },
+  {
+    "id": 40,
+    "name": "JBOSS_WILDFLY"
+  },
+  {
+    "id": 41,
+    "name": "IIS"
+  },
+  {
+    "id": 42,
+    "name": "APACHE_HTTPD"
+  },
+  {
+    "id": 43,
+    "name": "NGINX"
+  },
+  {
+    "id": 44,
+    "name": "WEBLOGIC"
+  },
+  {
+    "id": 45,
+    "name": "WEBSPHERE"
+  },
+  {
+    "id": 46,
+    "name": "IPSEC_IKE"
+  },
+  {
+    "id": 47,
+    "name": "NTP"
+  },
+  {
+    "id": 48,
+    "name": "DHCP"
+  },
+  {
+    "id": 49,
+    "name": "IPP"
+  },
+  {
+    "id": 50,
+    "name": "JETDIRECT"
+  },
+  {
+    "id": 51,
+    "name": "NFS"
+  },
+  {
+    "id": 52,
+    "name": "RPCBIND"
+  }
+]

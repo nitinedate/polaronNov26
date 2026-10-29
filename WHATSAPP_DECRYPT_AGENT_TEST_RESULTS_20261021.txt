@@ -1,0 +1,35 @@
+Polaron 2026-10-21 cumulative — verification results (v2: read-only ladder)
+Environment: Python 3.12, PostgreSQL 16 (scratch), frontend tsc from package-lock.
+
+Cumulative package: Standard/Deep + inventory stall fix + disk browse-dialog fix
++ Android WhatsApp decrypt agent with an ENFORCED READ-ONLY LADDER (45 files).
+
+Read-only WhatsApp ladder (crypt version x key-source matrix verified against the real decoder,
+using DIFFERENT random secrets for files/key vs the crypt15 root key, as on a device):
+  - crypt12/14 decrypt with the extracted device files/key (no key generated).
+  - crypt15 decrypts ONLY with the real 64-digit root key; files/key is correctly BLOCKED.
+    (Confirms a laptop-generated key cannot open an existing crypt15 backup.)
+  - live /data/data msgstore.db read read-only when root is ALREADY present (never escalates).
+  - already-plaintext msgstore.db registered as-is.
+  - device-modifying backup creation requires BOTH authorization tokens; one alone stays read-only.
+  - ladder prefers read-only even when backup creation is authorized; device untouched.
+
+WhatsApp agent tests:   16 passed in 0.30s
+Adapter integration:    4 passed in 0.48s
+Acceptance harness:     5 passed in 0.49s
+Frontend UI contract:   6 passed in 0.04s
+
+Earlier change sets still passing:
+  standard+inventory:   101 passed in 1.14s
+  profiles+browse:      14 passed in 0.40s
+
+Full regression — backend/tests + tests, ORIGINAL upload vs MODIFIED tree, same env, --timeout=20:
+  original : 224 failed, 1860 passed, 9 skipped, 5 warnings, 23 errors in 100.27s (0:01:40)
+  modified : 224 failed, 1998 passed, 9 skipped, 5 warnings, 23 errors in 102.24s (0:01:42)
+  Tests passing on original but failing on modified: 0
+  (224 failures / 23 errors identical and pre-existing. Passing 1860 -> 1998 = new tests.)
+
+Frontend tsc -b (strict): exit 0.
+
+NOT verified: connected Android phone, live ADB, real root/FFS extraction, real backup
+decryption, GPU/Neo4j/MinIO, native Windows host execution.

@@ -1,0 +1,25 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> iam-platform-frontend@0.1.0 build:mobile-android
+> tsc -b && vite build --mode mobile-android
+
+vite v5.4.21 building for mobile-android...
+transforming...
+✓ 2290 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /workspace/scratch/f67df2254e3c/project/frontend/src/lib/api.ts is dynamically imported by /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/hostDriveHelper.ts but also statically imported by /workspace/scratch/f67df2254e3c/project/frontend/src/components/AppLayout.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/components/forensic/ExtractionLogConsole.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/components/forensic/HostEvidencePanel.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/acquisitionSse.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/auth.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/forensicApi.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/jobUploadSession.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/reportSse.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/lib/vulnApi.ts, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/ActivateAccount.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Dashboard.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/FirmIam.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/ForgotPassword.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Login.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Permissions.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Profile.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/ResetPassword.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Roles.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Security.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Tenants.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/Users.tsx, /workspace/scratch/f67df2254e3c/project/frontend/src/pages/forensic/JobDetailPage.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                               0.91 kB │ gzip:   0.51 kB
+dist/assets/index-BNgMd8wW.css              205.29 kB │ gzip:  29.27 kB
+dist/assets/MobileReportPage-BFirxPzj.js      3.24 kB │ gzip:   1.46 kB
+dist/assets/ReportListPage-BMZT0d7I.js        6.01 kB │ gzip:   2.10 kB
+dist/assets/ReportEditorPage-pvowHfpn.js     63.34 kB │ gzip:  20.14 kB
+dist/assets/index-DFUhjOw4.js             1,442.04 kB │ gzip: 391.77 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.62s

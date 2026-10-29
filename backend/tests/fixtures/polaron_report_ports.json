@@ -1,0 +1,1618 @@
+{
+ "source": "8 Nessus solution-set exports (Polaron), Dec 2025 - Jul 2026; port 0 host-level rows excluded",
+ "files": [
+  "Core_solution_set_june_2026.xlsx",
+  "RRP_Solution_set_june_2026.xlsx",
+  "RRP_elec_solution_set_may_2026.xlsx",
+  "core_solution_set_July.xlsx",
+  "solution_set_Jan_26.xlsx",
+  "solution_set_Savarkar_May.xlsx",
+  "solution_set_September_Savarkar.xlsx",
+  "solution_set_lilavati_dec_2025.xlsx"
+ ],
+ "rows_total": 6659,
+ "rows_port_0": 437,
+ "rows_with_port": 6222,
+ "ports": [
+  {
+   "protocol": "tcp",
+   "port": 7,
+   "findings": 4,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 17,
+   "findings": 3,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 21,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 22,
+   "findings": 481,
+   "hosts": 33,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 23,
+   "findings": 39,
+   "hosts": 30,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 53,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 80,
+   "findings": 125,
+   "hosts": 39,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 139,
+   "findings": 9,
+   "hosts": 7,
+   "reports": [
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 222,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 443,
+   "findings": 1224,
+   "hosts": 230,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 445,
+   "findings": 432,
+   "hosts": 314,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 513,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 548,
+   "findings": 2,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 631,
+   "findings": 70,
+   "hosts": 12,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 636,
+   "findings": 8,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 853,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1112,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1234,
+   "findings": 3,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1433,
+   "findings": 111,
+   "hosts": 14,
+   "reports": [
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1443,
+   "findings": 5,
+   "hosts": 2,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1514,
+   "findings": 8,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1521,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1801,
+   "findings": 13,
+   "hosts": 9,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 1883,
+   "findings": 6,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 2002,
+   "findings": 14,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 2381,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 2474,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 2500,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 3071,
+   "findings": 12,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 3260,
+   "findings": 2,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 3329,
+   "findings": 10,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 3389,
+   "findings": 1463,
+   "hosts": 212,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 3718,
+   "findings": 13,
+   "hosts": 11,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 3900,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 4443,
+   "findings": 105,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 4444,
+   "findings": 9,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 4475,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 4510,
+   "findings": 10,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5001,
+   "findings": 8,
+   "hosts": 3,
+   "reports": [
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5008,
+   "findings": 5,
+   "hosts": 3,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5057,
+   "findings": 8,
+   "hosts": 2,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5061,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5672,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5800,
+   "findings": 61,
+   "hosts": 49,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5900,
+   "findings": 3,
+   "hosts": 2,
+   "reports": [
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 5989,
+   "findings": 37,
+   "hosts": 6,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 6160,
+   "findings": 24,
+   "hosts": 12,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 6466,
+   "findings": 4,
+   "hosts": 2,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 6467,
+   "findings": 4,
+   "hosts": 2,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 6805,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 7070,
+   "findings": 152,
+   "hosts": 45,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 7443,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 7444,
+   "findings": 8,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8000,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8002,
+   "findings": 20,
+   "hosts": 9,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8009,
+   "findings": 5,
+   "hosts": 2,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8013,
+   "findings": 2,
+   "hosts": 2,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8061,
+   "findings": 3,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8080,
+   "findings": 24,
+   "hosts": 10,
+   "reports": [
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8088,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8090,
+   "findings": 25,
+   "hosts": 5,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8091,
+   "findings": 8,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8092,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8099,
+   "findings": 220,
+   "hosts": 85,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8182,
+   "findings": 28,
+   "hosts": 4,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8443,
+   "findings": 71,
+   "hosts": 19,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8444,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 8834,
+   "findings": 4,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 9000,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 9091,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 9111,
+   "findings": 31,
+   "hosts": 5,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 9443,
+   "findings": 10,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 9922,
+   "findings": 3,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 9998,
+   "findings": 206,
+   "hosts": 82,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 10000,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Savarkar_May.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 11081,
+   "findings": 11,
+   "hosts": 2,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 11712,
+   "findings": 8,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 12351,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 13000,
+   "findings": 6,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 13001,
+   "findings": 22,
+   "hosts": 4,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 13291,
+   "findings": 3,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 13299,
+   "findings": 6,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 13591,
+   "findings": 6,
+   "hosts": 2,
+   "reports": [
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 17000,
+   "findings": 3,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 19111,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 19170,
+   "findings": 3,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 21073,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 22350,
+   "findings": 14,
+   "hosts": 3,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 22352,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 22443,
+   "findings": 31,
+   "hosts": 4,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 26769,
+   "findings": 28,
+   "hosts": 8,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Savarkar_May.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 26770,
+   "findings": 22,
+   "hosts": 7,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Savarkar_May.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 27000,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 33443,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 33536,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 38485,
+   "findings": 4,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 40939,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 44384,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 44443,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 47098,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 47101,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 47547,
+   "findings": 48,
+   "hosts": 10,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49154,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49155,
+   "findings": 9,
+   "hosts": 6,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49156,
+   "findings": 8,
+   "hosts": 6,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49157,
+   "findings": 3,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49159,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49175,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49182,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49183,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49193,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49259,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49260,
+   "findings": 18,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49261,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49262,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49263,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49264,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49265,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49266,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49273,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49278,
+   "findings": 9,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49281,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49293,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49302,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49316,
+   "findings": 7,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49668,
+   "findings": 6,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49735,
+   "findings": 13,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 49738,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "RRP_elec_solution_set_may_2026.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 51849,
+   "findings": 5,
+   "hosts": 1,
+   "reports": [
+    "RRP_elec_solution_set_may_2026.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 56155,
+   "findings": 1,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "windows_dynamic_rpc"
+  },
+  {
+   "protocol": "tcp",
+   "port": 56164,
+   "findings": 20,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 56168,
+   "findings": 11,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 57674,
+   "findings": 6,
+   "hosts": 1,
+   "reports": [
+    "RRP_elec_solution_set_may_2026.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 58290,
+   "findings": 9,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 61553,
+   "findings": 20,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "tcp",
+   "port": 62128,
+   "findings": 324,
+   "hosts": 68,
+   "reports": [
+    "Core_solution_set_june_2026.xlsx",
+    "core_solution_set_July.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 62990,
+   "findings": 4,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "ephemeral_range_service"
+  },
+  {
+   "protocol": "tcp",
+   "port": 63891,
+   "findings": 18,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "sql_server_dynamic"
+  },
+  {
+   "protocol": "udp",
+   "port": 7,
+   "findings": 4,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "udp",
+   "port": 17,
+   "findings": 3,
+   "hosts": 2,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "udp",
+   "port": 53,
+   "findings": 20,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "udp",
+   "port": 69,
+   "findings": 2,
+   "hosts": 1,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "udp",
+   "port": 161,
+   "findings": 116,
+   "hosts": 54,
+   "reports": [
+    "RRP_Solution_set_june_2026.xlsx",
+    "RRP_elec_solution_set_may_2026.xlsx",
+    "core_solution_set_July.xlsx",
+    "solution_set_Jan_26.xlsx",
+    "solution_set_Savarkar_May.xlsx",
+    "solution_set_September_Savarkar.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "udp",
+   "port": 623,
+   "findings": 6,
+   "hosts": 3,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  },
+  {
+   "protocol": "udp",
+   "port": 5355,
+   "findings": 25,
+   "hosts": 18,
+   "reports": [
+    "solution_set_Jan_26.xlsx",
+    "solution_set_lilavati_dec_2025.xlsx"
+   ],
+   "class": "fixed_service"
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+M .env.example
+A CHANGED_FILES_V1_9_5.txt
+A RELEASE_V1_9_5_LOGGING_AND_TIMEOUTS.md
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/gmp_local.py
+M scanner-agent/agent/main.py
+M scanner-agent/agent/openvas_log.py
+M scanner-agent/agent/scan_performance.py
+A scanner-agent/tests/test_logging_and_timeouts_v195.py
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py
+M scanner-agent/tests/test_parallel_and_tail_v193.py
+M scanner-agent/tests/test_performance_v166.py

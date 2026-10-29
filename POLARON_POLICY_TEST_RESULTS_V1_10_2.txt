@@ -1,0 +1,49 @@
+Polaron V1.10.2 — Polaron policy — verification results
+Environment: Python 3.12.3, pytest 9.1, Node/tsc/vite from frontend package-lock (npm ci), LibreOffice recalc
+
+1. New tests
+   backend/tests/test_polaron_policy_v1102.py                   15 passed
+   laptop-scanner/scanner-agent/tests/test_polaron_policy_v1102.py  3 passed
+   Checked: single default template; scope = Basic Network Scan ∪ report ports (262 TCP / 35 UDP)
+   against a fixture derived from the 8 exports; report ports kept when every policy service is
+   disabled; 18 per-host dynamic ports; catalog and policy-module copies byte-identical; built-in
+   name "Polaron policy"; older-agent fallback for builds v61.0, protocol-only "1.5.9" and none;
+   templates without min_agent_build untouched; simulated v61 agent rejects the keyed request and
+   runs the fallback request with an identical port range; frontend preselects the server default.
+
+2. Policy-area existing backend suites (test_builtin_policies_v180, test_scan_templates_v165,
+   test_scan_performance_v166): 37 passed, 2 skipped (PostgreSQL-only), 1 failed —
+   test_scan_performance_v166::test_policy_speed_is_validated also fails on the original upload.
+
+3. Full regression — backend/tests + tests, --timeout=20, same environment
+   original upload : 217 failed, 2049 passed, 10 skipped, 20 errors
+   this package    : 217 failed, 2114 passed, 10 skipped, 20 errors
+   Tests failing here but passing on the original: 0 (identical failing set)
+
+4. Laptop-agent suite (laptop-scanner/scanner-agent/tests)
+   original upload : 2 failed, 434 passed
+   this package    : 2 failed, 437 passed (same 2: test_local_credentials_v190 auto-bind tests)
+   Updated pins: test_no_false_clean_v157 + test_no_nexus_budget_v163 (build 1.10.2-v62.0),
+   test_templates_v165 (vendor allow-list gains "polaron" with its own rule).
+
+5. Frontend
+   tsc -b: exit 0. An injected type error in ScanJobsPage.tsx was reported (TS2322/TS2367), then reverted.
+   vite build --mode vuln: built OK (pre-existing >500 kB chunk warning only).
+
+6. docs/POLARON_POLICY_PORT_MATRIX.xlsx
+   recalc: 2,168 formulas, 0 errors. Values checked: policy 262/35; Basic Network 154/33;
+   report ports 138/7; already in Basic 30/5; added 108/2; per-host 18; 8 reports; 6,659 rows;
+   437 port-0 rows; 145 pairs; matrix findings total 6,222 = rows with a port.
+
+NOT verified: a live scan; the Launch dialog in a browser; built-in seeding on PostgreSQL
+(AETHERIS_TEST_PG_URL not set); a v61 laptop claiming a real job.
+
+7. Silent IPs (same V1.10.2 build, added afterwards) — see SILENT_HOSTS_NOT_ASSESSED_V1_10_2.md
+   backend/tests/test_silent_hosts_v1102.py                               6 passed
+   laptop-scanner/scanner-agent/tests/test_reachability_diagnosis_v1102.py 7 passed
+   Full regression after both changes: backend/tests + tests 217 failed / 2120 passed / 20 errors —
+   identical failing set to the original upload. Agent suite 444 passed, same 2 pre-existing failures.
+   Deliberately updated: test_service_ports_v170::test_no_exposed_services_is_a_finished_result (row text).
+   Found during work: this sandbox answers ICMP echo for any address; the control ping (192.0.2.1)
+   now makes the agent report "ping unreliable" instead of guessing a cause.
+   tsc -b clean (injected error caught); vite build --mode vuln OK.

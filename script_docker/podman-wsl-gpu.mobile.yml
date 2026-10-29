@@ -1,0 +1,30 @@
+# Podman on WSL does not honor Compose `gpus: all`, so the CUDA sidecar
+# exits 127 (nvidia-smi is not in the image; the Windows driver provides it).
+# Mount the WSL driver and device. Docker Desktop already injects these, so
+# the launcher adds this file only when the engine is Podman.
+x-podman-wsl-gpu: &podman-wsl-gpu
+  devices:
+    - /dev/dxg:/dev/dxg
+  volumes:
+    - /usr/lib/wsl:/usr/lib/wsl:ro
+  environment:
+    LD_LIBRARY_PATH: /usr/lib/wsl/lib
+    PATH: /usr/lib/wsl/lib:/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+services:
+  nvidia-cuda:
+    <<: *podman-wsl-gpu
+  api:
+    <<: *podman-wsl-gpu
+  worker-build:
+    <<: *podman-wsl-gpu
+  worker-parse:
+    <<: *podman-wsl-gpu
+  worker-rag:
+    <<: *podman-wsl-gpu
+  worker-ocr:
+    <<: *podman-wsl-gpu
+  worker-report:
+    <<: *podman-wsl-gpu
+  worker-beat:
+    <<: *podman-wsl-gpu

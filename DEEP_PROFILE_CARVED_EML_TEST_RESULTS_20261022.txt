@@ -1,0 +1,50 @@
+Polaron 2026-10-22 — Deep profile / carved EML / artifact open — verification results
+Environment: Python 3.12.3, pytest 9.1, Node + tsc/vite from frontend package-lock (npm ci)
+
+1. Compile: every new/modified backend module — python -m py_compile: OK
+
+2. New tests (modified tree)
+   backend/tests/test_artifact_open_parsers_20261022.py   38 passed
+   tests/test_processing_profile_selection_20261022.py    12 passed
+
+3. Same new tests against the ORIGINAL upload (proves they detect the bugs)
+   tests/test_processing_profile_selection_20261022.py    12 failed
+   carver / carved-preview / read-order tests              9 failed, 1 passed
+   (original carved preview of OWA memory: subject = "carved-eml-pagefile.sys-612902912.eml",
+    body contains U+FFFD — the Image 3 symptom)
+
+4. Affected existing suites after fixes (modified tree)
+   test_artifact_preview, test_carved_email_mime_v36, test_email_preview,
+   test_disk_browse_dialog_not_auto_opened, test_standard_deep_profiles + new tests: 84 passed
+
+5. Full regression — backend/tests + tests, --timeout=20, same environment
+   original (full extract) : 217 failed, 2049 passed, 10 skipped, 20 errors
+   modified                : 217 failed, 2099 passed, 10 skipped, 20 errors
+   Tests failing on modified but passing on original: 0
+   Failing sets are identical (pre-existing: missing Magnet AXIOM CSV, live
+   Redis/Postgres/Neo4j/MinIO, packages absent from this sandbox, obsolete assertions).
+
+   Found and fixed during regression:
+   - test_signature_carve_records_real_unallocated_inode: a message preceded by slack
+     bytes with no line break was rejected by a line-start rule. The carver now tries
+     both the header-block start and the hit itself.
+   - test_resolve_artifact_bytes_falls_back_to_extraction: call signature of
+     _read_bytes_from_extraction kept backward compatible.
+
+   Deliberately updated (they asserted the old, buggy code):
+   - tests/test_disk_browse_dialog_not_auto_opened.py::test_profile_is_sent_with_the_folder_registration
+   - tests/test_standard_deep_profiles.py::test_frontend_offers_only_two_profiles
+     (both required `processing_profile: processingProfile,` — the stale-closure value)
+   - tests/test_standard_deep_profiles.py::test_mode_is_saved_before_background_queue
+     (jsonb_set moved into processing_profile.set_job_processing_profile)
+
+6. Frontend
+   tsc -b (strict, as npm run build): exit 0, no diagnostics
+   Injected type errors in ArtifactPreviewPanel.tsx and HostEvidencePanel.tsx were reported
+   (TS2322/TS2352), then reverted.
+   vite build --mode forensic: built OK (pre-existing >500 kB chunk warning only)
+
+NOT verified: real E01/E02 run; TSK source read on a mounted image (stubbed reader);
+live PostgreSQL execution of the records-page SQL and job_artifact_locations DDL/inserts;
+a real .msg file (synthetic MS-OXMSG structure); browser rendering of the new views;
+timing improvements.

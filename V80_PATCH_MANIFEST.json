@@ -1,0 +1,205 @@
+{
+  "release": "V80",
+  "changes_from_original_upload": [
+    {
+      "path": "FORENSIC_PROCESS_V78.md",
+      "sha256": "4e91c8c0287aedd0781d52492a9d94236d00051fd60fde44739bedd71eec39cb"
+    },
+    {
+      "path": "SOURCE_COVERAGE_V79.md",
+      "sha256": "d4abfb6a7b434657dae51eae70946af7b4147d1b0cb54221c122bc0da4421fc9"
+    },
+    {
+      "path": "STORAGE_CAPACITY_V80.md",
+      "sha256": "f5716d68b226216dd58ca6df36d752ed78a34c5f9a1839fc0daaedeceb13fd95"
+    },
+    {
+      "path": "V78_BASELINE_TEST_RESULTS.txt",
+      "sha256": "465106d48238e6a1067b97368061f9aeb3e31a1617091b26b757ab78c8d8f765"
+    },
+    {
+      "path": "V78_PATCH_MANIFEST.json",
+      "sha256": "019e37787de6c094418d31288e5156da25ac291ac68a1f67a2a61a64b3be94bc"
+    },
+    {
+      "path": "V78_TEST_RESULTS.txt",
+      "sha256": "2f4cc9a64b082f9ab3ec500e6cf2063b0e7b2694fb3b886d8ebdd08f71b83a80"
+    },
+    {
+      "path": "V79_FRONTEND_BUILD.txt",
+      "sha256": "473ccc7d838baf48e9a883aa64c02f2d876dbfa8882edf7c7f7e9a8df09d4271"
+    },
+    {
+      "path": "V79_PATCH_MANIFEST.json",
+      "sha256": "1651f75c9e731a46be873d28e503d86d9f0f6e3d1f36379a2c7f9bcb0e59dc86"
+    },
+    {
+      "path": "V79_TEST_RESULTS.txt",
+      "sha256": "968b36a99e891924c8465f15e4062d5a80bd0228d1b6cddd435b1ac03125bfa5"
+    },
+    {
+      "path": "V80_BASELINE_EXTRACTION_TEST_RESULTS.txt",
+      "sha256": "1e9802b061a1ab1c168a0fa583c92d680931631aa919d1165d58dc5c24fa9748"
+    },
+    {
+      "path": "V80_EXTRACTION_TEST_RESULTS.txt",
+      "sha256": "ff521a78b337699a60de5290f9c742f88e910fd7f768132c8cdc0b81100d634a"
+    },
+    {
+      "path": "V80_TEST_RESULTS.txt",
+      "sha256": "6bb52560fbe7508bf79a0cfd63014706a32ebe0ec02b8b526526c73d342a08a4"
+    },
+    {
+      "path": "backend/app/celery_factory.py",
+      "sha256": "621eb844bd348e01e4cf48596bd4f68cf7af531d9f2108321498b7447285b48a"
+    },
+    {
+      "path": "backend/app/retrieval/hybrid.py",
+      "sha256": "efb03ee0dc59bf659b64923b81394cd231fd4a7269089c1b34c4826dc5ada87c"
+    },
+    {
+      "path": "backend/app/services/axiom_forensic_kb.py",
+      "sha256": "543ed0ae9f1a1d5a043c01e3b6f1a6f35b12f544f23cdca731ac617aa4b7156d"
+    },
+    {
+      "path": "backend/app/services/disk.py",
+      "sha256": "24659f740c7eaa60788dea7afe82623d270be18bdeee63b63a604032dffdfae3"
+    },
+    {
+      "path": "backend/app/services/extracted_disk.py",
+      "sha256": "4a3bd17188108116bf9495190880c90887314cb894d31a44184b8d46720d4126"
+    },
+    {
+      "path": "backend/app/services/forensic_failure_alerts.py",
+      "sha256": "afb6ab905c9d8e5e77a825b9a97cd4b1ed2be0d7cdd93146cc7b8a0ebebbc308"
+    },
+    {
+      "path": "backend/app/services/forensic_investigation_questions.py",
+      "sha256": "32ab6fae5a066d4fab68236f30769efb04768e0c42d4bb82f246c4a506fb28c0"
+    },
+    {
+      "path": "backend/app/services/forensic_question_analysis.py",
+      "sha256": "3083f273f103575b2e946f1b55c42b1bfcccf6369c2ef562c792bf9b36ef5787"
+    },
+    {
+      "path": "backend/app/services/forensic_serial_pipeline.py",
+      "sha256": "0a8b9a943e121d6a1fc7e8546b33d5082388535f5ebb705e015167491983f8b8"
+    },
+    {
+      "path": "backend/app/services/forensic_serial_stages.py",
+      "sha256": "b6fdc2a6ab09ac97b60ee9cb4e501f889976f1ff9cec5f94201a11ca1da74759"
+    },
+    {
+      "path": "backend/app/services/forensic_stage_worker.py",
+      "sha256": "bc338a7f34242c88e4bfaf7236dac07a9d00753978df074f6b24d3e613ec8a84"
+    },
+    {
+      "path": "backend/app/services/mobile_forensic/coverage.py",
+      "sha256": "7832db5436de74acad15348d613a58f3850a50369d5226b5a842882efe43f031"
+    },
+    {
+      "path": "backend/app/services/mobile_quality_ocr.py",
+      "sha256": "77a4ddd25780bcf30cca95b14235c9396e6f2aa850a71e5d3b0a585110f8f0ea"
+    },
+    {
+      "path": "backend/app/services/neo4j_sync.py",
+      "sha256": "eff14af0d36a3724910911c1e6cba4400c9e819bfc5b4b215ef8d34cdf944546"
+    },
+    {
+      "path": "backend/app/services/pipeline_progress.py",
+      "sha256": "9580d64a32180abd2683f0d0a093e67433421484447c5da2f8dbc8597ddfc291"
+    },
+    {
+      "path": "backend/app/services/pipeline_supervisor.py",
+      "sha256": "6d8d17a78dc184088c3b15fcafa0daf9b52d195ca4842f7d088b255670792105"
+    },
+    {
+      "path": "backend/app/services/process_completion.py",
+      "sha256": "b675e8f343343a89d422f2833d350d54a96cdca30ba7a68b9a8c30d82e2a41cc"
+    },
+    {
+      "path": "backend/app/services/progress_agent.py",
+      "sha256": "00fdc38525f9678b521b3692ce0b948cff23ed1f8b923cc812c41c2d27c44836"
+    },
+    {
+      "path": "backend/app/services/report_generator.py",
+      "sha256": "55a1434b1b60275d9a9cc9cb1efc0ede3db0ef34f7659d30f68c52c0b1dcfda3"
+    },
+    {
+      "path": "backend/app/services/report_objective_evidence.py",
+      "sha256": "c537f449dac6aa07e6a209b53e46f407f26f7e5c33c479f8a4d709aa5cc5f802"
+    },
+    {
+      "path": "backend/app/services/report_objectives_observation_service.py",
+      "sha256": "9116cf145722ec8bf6518cda3b14ab5fa6124343b11c58d51b9088facb136bd4"
+    },
+    {
+      "path": "backend/app/services/safe_parallel.py",
+      "sha256": "a09f3ed0f9c46c8b1b9608fd9a52f7327ed1d296f52c5d377eaaa93ca37e787f"
+    },
+    {
+      "path": "backend/app/services/source_coverage.py",
+      "sha256": "7397a43062bb72a7ee40c6ca626e448505a8657d037f67e9b3b24d14b6d9822c"
+    },
+    {
+      "path": "backend/app/services/storage.py",
+      "sha256": "475c7a82739c0cd04df7f817aad08a9a2be6db9bbf5f55e331b163326ce7b2ed"
+    },
+    {
+      "path": "backend/app/services/storage_capacity.py",
+      "sha256": "54b3be0dbdf0dad173c14616ea59fbdcf6ff3f4ae809a26236577da096eaf334"
+    },
+    {
+      "path": "backend/app/services/virtual_disk.py",
+      "sha256": "337c9b0d6d271085e47d8c6423c76c26cb7f86f2d858c1deaf40a20244543e22"
+    },
+    {
+      "path": "backend/app/tasks.py",
+      "sha256": "54c0423c1403f711bd0aec54cb4536db8fdf0d5783b22671eaeb0d9397adb171"
+    },
+    {
+      "path": "backend/scripts/install_process_indexes_v78.py",
+      "sha256": "2260a1c06d2491c0d61d73cf21b6f4a858f19ab1637765c56427f681a4528844"
+    },
+    {
+      "path": "backend/tests/test_forensic_process_v78.py",
+      "sha256": "aa8432de1f24999167d6d794fe1557c2643030012acdc84083702ccad573befc"
+    },
+    {
+      "path": "backend/tests/test_progress_agent_v54.py",
+      "sha256": "76250c551ba69d6f52ff8831ab16f9593fa68fe60e6e2933da0103a727cafe52"
+    },
+    {
+      "path": "backend/tests/test_source_coverage_v79.py",
+      "sha256": "6c9bb8704558cdc8787c27e62eafbfed1e7f1b7c1647b0164f8e7c3e8d65e700"
+    },
+    {
+      "path": "backend/tests/test_storage_capacity_v80.py",
+      "sha256": "52c9c01404aaa5d5dbd54ecdc2ff3429c4f938945032c9438b603493e73b8af9"
+    },
+    {
+      "path": "docs/ANDROID_FORENSIC_FLOW_AND_PROCESS_V78.pdf",
+      "sha256": "a36bd37684def893893373227dd05a504e6cc6837240bf1a81e608c18beb01c4"
+    },
+    {
+      "path": "docs/ANDROID_IMAGE_TO_EVIDENCE_V78.svg",
+      "sha256": "0c0ce81e60244638eab13c9e873c139fe16ad16871578e7098b3fcb3925c7023"
+    },
+    {
+      "path": "frontend/src/components/forensic/SerialPipelineBanner.tsx",
+      "sha256": "d1f9dbc1442aa70cff1718989f3e08c492ee0dbff46901cb5dce8de69424cef2"
+    },
+    {
+      "path": "frontend/src/lib/types/forensic.ts",
+      "sha256": "8a9f63be146a344cf2b5f5bc571a334aac6939d80783a356a967e1b46f855739"
+    },
+    {
+      "path": "frontend/tsconfig.tsbuildinfo",
+      "sha256": "f3a2c5a626e71c72110691756f40b9afcb9fa7ba5273a142024879e436fcf52a"
+    },
+    {
+      "path": "scripts/Test-ForensicStorage.ps1",
+      "sha256": "61cd1c9543eb5524e2f3609097d5c737c9c098c6a7085a82d7e0a14b91a07e73"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+A CHANGED_FILES_V1_9_4.txt
+A RELEASE_V1_9_4_NVT_PROBE.md
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/gmp_local.py
+M scanner-agent/tests/test_greenbone_readiness_v148.py
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py

@@ -1,0 +1,95 @@
+Polaron V1.26.1 - Client-computer evidence, outbound connection, less upload, noise removal, antivirus, parser sandbox (cumulative on V1.20.1).
+1.26.1: the antivirus starts with startup.cmd / start-stack.ps1; diagnostics and pre-flight list updated.
+1.26.0: hostile-file parsers confined (seccomp helper); removal needs a preserved APK or an audited override.
+1.25.0: ClamAV antivirus stage in an isolated scanner; definitions at every start and daily; container hardening.
+1.24.0: game libraries left out, examiner review before extraction, NSRL known-good filter wired in.
+1.23.0: adaptive block runs, empty-space skipping + compression (agent 1.2.0), transfer figures on the job card.
+1.22.0: the agent connects out to the server (works from home / other sites without VPN).
+1.21.0: evidence can stay on the examiner's computer; the forensic server processes it in place over the network
+        (Client Evidence Agent + read-only FUSE mount). Mobile drive dialog no longer opens by itself.
+
+Added
+  RELEASE_V1_21_0_CLIENT_COMPUTER_EVIDENCE.md
+  RELEASE_V1_22_0_CLIENT_EVIDENCE_OUTBOUND.md
+  RELEASE_V1_23_0_CLIENT_EVIDENCE_LESS_UPLOAD.md
+  RELEASE_V1_24_0_NOISE_REMOVAL.md
+  RELEASE_V1_25_0_ANTIVIRUS.md
+  RELEASE_V1_26_0_PARSER_SANDBOX.md
+  RELEASE_V1_26_1_STARTUP_ANTIVIRUS.md
+  CHANGED_FILES_V1_26_1.txt
+  backend/app/malware/sandbox.py
+  backend/app/malware/sandbox_child.py
+  backend/app/malware/sandbox_policy.py
+  backend/tests/test_malware_sandbox_v1_26.py
+  frontend/src/components/malware/RemediatePanel.test.tsx
+  services/mobile-malware/clamav/Dockerfile
+  services/mobile-malware/clamav/polaron-clamav.sh
+  backend/app/malware/engines/antivirus.py
+  backend/tests/test_malware_antivirus_v1_25.py
+  frontend/src/components/malware/AntivirusStatusCard.tsx
+  frontend/src/components/malware/AntivirusStatusCard.test.tsx
+  backend/app/routers/extract_review.py
+  backend/app/services/extract_review.py
+  backend/app/services/known_good_filter.py
+  backend/app/services/known_good_cli.py
+  backend/tests/test_noise_review_v1_24.py
+  frontend/src/components/forensic/ExtractReviewPanel.tsx
+  backend/app/routers/client_evidence.py
+  backend/app/services/client_evidence/__init__.py
+  backend/app/services/client_evidence/agent_client.py
+  backend/app/services/client_evidence/celery_hooks.py
+  backend/app/services/client_evidence/fusefs.py
+  backend/app/services/client_evidence/job_source.py
+  backend/app/services/client_evidence/mount.py
+  backend/app/services/client_evidence/registry.py
+  backend/app/services/client_evidence/relay.py
+  backend/tests/test_client_evidence_v1_21.py
+  scripts/client-evidence-agent/Install-PolaronClientEvidenceAgent.cmd
+  scripts/client-evidence-agent/polaron-client-evidence-agent.ps1
+  frontend/public/downloads/client-evidence-agent/Install-PolaronClientEvidenceAgent.cmd
+  frontend/public/downloads/client-evidence-agent/polaron-client-evidence-agent.ps1
+  frontend/src/components/forensic/ClientEvidenceBrowser.tsx
+  frontend/src/components/forensic/ClientEvidenceBrowser.test.tsx
+  frontend/src/components/forensic/ClientEvidenceSourceCard.tsx
+  frontend/src/lib/clientEvidenceAgent.ts
+
+Modified
+  scripts/start-stack.ps1                                      start clamav-update first and clamav-scan last (never fatal)
+  scripts/check-malware-stack.ps1                              antivirus checks
+  script_docker/start_docker.required-files.json               ClamAV files in the pre-flight list
+  backend/app/malware/engines/yara_engine.py                   YARA matching through the sandbox
+  backend/app/malware/engines/static.py                        androguard/LIEF/APKiD confined
+  frontend/src/components/malware/RemediatePanel.tsx           preserved / not preserved, audited override
+  frontend/src/lib/types/malware.ts                            preserved flag
+  frontend/src/pages/mobile/malware/malware.ui.test.tsx        fixture: apps marked preserved
+  services/mobile-malware/docker-compose.yml                  clamav-update/clamav-scan, internal network, hardening
+  backend/app/malware/pipeline.py                              antivirus stage; start-up intel refresh trigger
+  backend/app/malware/tasks.py                                 refresh intel when the beat starts
+  backend/app/malware/router.py                                GET /api/malware/antivirus/status (+ parser sandbox); removal guard
+  backend/app/malware/engines/base.py                          antivirus engine version
+  frontend/src/lib/malwareApi.ts                               antivirusStatus
+  frontend/src/components/malware/stages.ts                    stage label
+  frontend/src/pages/mobile/malware/MalwareIntelPage.tsx       antivirus card
+  backend/app/services/extract_os_vendor_noise.py             game-library rule (Standard)
+  backend/app/services/extracted_disk.py                       review gate; known-good split at shard and manifest
+  .env.example                                               CLIENT_EVIDENCE_* and CLIENT_EVIDENCE_RELAY_* settings
+  backend/Dockerfile                                         fuse3 libfuse2t64
+  backend/requirements.txt                                   fusepy==3.0.1
+  backend/app/app_factory.py                                 mount client_evidence, agent relay and extract_review routers (disk + mobile APIs)
+  backend/app/celery_factory.py                              task_prerun hook mounts a job's client shares in the worker
+  backend/app/routers/jobs.py                                list-folder re-seeds client shares; browser upload refused for client jobs
+  backend/app/schemas/forensic.py                            ClientSourceBody
+  backend/app/services/host_evidence.py                      client-evidence:// paths in resolve_host_path; client_remote residency at registration
+  backend/app/services/job_delete.py                         delete job revokes and unmounts client shares (never deletes client files)
+  backend/app/services/virtual_disk.py                       mount client share before opening an image
+  docker-compose.yml                                         x-client-evidence-fuse on API and job workers
+  services/mobile-android/docker-compose.yml                 FUSE device/capability on x-app-common
+  services/mobile-ios/docker-compose.yml                     FUSE device/capability on x-app-common
+  frontend/src/components/forensic/HostEvidencePanel.tsx     Forensic server / This computer choice in full and compact views
+  frontend/src/lib/forensicApi.ts                            client-source API calls
+  frontend/src/lib/orchestrationStages.ts                    client_remote = in-place transport (no Download Agent)
+  frontend/src/pages/forensic/JobDetailPage.tsx              no auto-opened drive dialog for mobile jobs; client status card
+  frontend/src/pages/mobile/MobileCompactJobPage.tsx         no auto-opened drive dialog; client status card; location wording
+
+Removed
+  (none)

@@ -1,0 +1,14 @@
+M .env.example
+A Apply-Scanner-v1.9.6.cmd
+A Apply-Scanner-v1.9.6.ps1
+A CHANGED_FILES_V1_9_6.txt
+A RELEASE_V1_9_6_READINESS_AND_NOTES.md
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/gmp_local.py
+M scanner-agent/agent/main.py
+M scanner-agent/agent/scan_performance.py
+M scanner-agent/tests/test_logging_and_timeouts_v195.py
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py
+A scanner-agent/tests/test_readiness_and_notes_v196.py

@@ -1,0 +1,17 @@
+A scanner-agent/agent/self_target.py
+A scanner-agent/tests/test_self_target_v180.py
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/coverage_reconcile.py
+M scanner-agent/agent/gmp_local.py
+M scanner-agent/agent/lan_fingerprint.py
+M scanner-agent/agent/main.py
+M scanner-agent/agent/scan_templates.json
+M scanner-agent/agent/service_policy.py
+M scanner-agent/agent/service_port_policy.json
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py
+M scanner-agent/tests/test_service_ports_v170.py
+M scanner-agent/tests/test_speed_v167.py
+M scanner-agent/tests/test_templates_v165.py
+M scripts/Write-LanFingerprint.ps1

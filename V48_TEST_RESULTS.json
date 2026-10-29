@@ -1,0 +1,15 @@
+{
+  "release": "V48",
+  "status": "PASS_WITH_ENVIRONMENT_LIMITATIONS",
+  "suites": [
+    {"name": "new_mobile_v48_platform_ocr_report", "passed": 10, "failed": 0},
+    {"name": "mobile_report_catalog_private_acquisition_compatible", "passed": 19, "failed": 0, "deselected": 1},
+    {"name": "ocr_glm_compatible", "passed": 37, "failed": 0, "deselected": 1},
+    {"name": "shared_report_structure_assertion", "passed": 1, "failed": 0}
+  ],
+  "environment_limitations": [
+    "Local runner does not include celery",
+    "Local runner does not include psycopg2",
+    "Local runner does not include pycryptodome/Crypto"
+  ]
+}

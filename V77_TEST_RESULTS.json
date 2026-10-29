@@ -1,0 +1,12 @@
+{
+  "version": "V77",
+  "focused_tests": {
+    "test_v77_single_backend_build.py": "3 passed"
+  },
+  "python_compileall": "passed",
+  "compose_files_scanned": 25,
+  "duplicate_mapping_keys": 0,
+  "same_image_multiple_builders": 0,
+  "docker_runtime_validation": "not run; Docker CLI unavailable in this environment",
+  "note": "Legacy test_dynamic_drive_compose.py has unrelated pre-existing failures and was not used as a V77 acceptance gate."
+}

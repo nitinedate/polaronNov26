@@ -1,0 +1,270 @@
+import logging
+import os
+import shutil
+from collections import UserDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import cached_property
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING, Any, Optional, Union
+
+import requests
+from pyimg4 import IM4P  # pyright: ignore[reportMissingTypeStubs]
+
+from ipsw_parser.archive import Archive
+from ipsw_parser.component import Component, SupportsPathByEntry
+from ipsw_parser.dsc import split_dsc
+from ipsw_parser.process import ProcessExecutionError, run
+
+if TYPE_CHECKING:
+    from ipsw_parser.build_manifest import BuildManifest
+
+logger = logging.getLogger(__name__)
+
+AEA_MAGIC = b"AEA1"
+
+
+def extract_as(
+    archive: Archive, member_name: str, output_path: Union[str, "os.PathLike[str]"], chunk_size: int = 64 * 1024
+) -> None:
+    """Extract one archive member into a caller-provided path."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with archive.open(member_name) as source, open(output_path, "wb") as target:
+        shutil.copyfileobj(source, target, length=chunk_size)
+
+
+def _extract_dmg(dmg: Path, output: Path, sub_path: Optional[Path] = None, pem_db: Optional[str] = None) -> None:
+    # darwin system statistically have problems cleaning up after detaching the mountpoint
+    with TemporaryDirectory() as temp_dir_name:
+        temp_dir = Path(temp_dir_name)
+        mnt = temp_dir / "mnt"
+        mnt.mkdir()
+
+        with dmg.open("rb") as f:
+            magic = f.read(len(AEA_MAGIC))
+        if magic == AEA_MAGIC:
+            logger.debug("Found Apple Encrypted Archive. Decrypting...")
+            aea_dmg = str(dmg.absolute()) + ".aea"
+            dmg.rename(aea_dmg)
+            dmg = temp_dir / Path(aea_dmg).name.rsplit(".", 1)[0]
+            args: list[Union[str, Path]] = ["fw", "aea", aea_dmg, "-o", temp_dir]
+            if pem_db is not None:
+                pem_db_path: Union[str, Path] = pem_db
+                if "://" in pem_db:
+                    # create a local file containing it
+                    pem_db_path = temp_dir / "pem-db.json"
+                    pem_db_path.write_text(requests.get(pem_db, verify=False).text)
+                args += ["--pem-db", pem_db_path]
+            run("ipsw", *args)
+
+        run("hdiutil", "attach", "-mountpoint", mnt, dmg)
+
+        try:
+            src = mnt if sub_path is None else mnt / sub_path
+            shutil.copytree(src, output, symlinks=True, dirs_exist_ok=True)
+        except shutil.Error:
+            # when overwriting the same files, some of them don't contain write permissions
+            pass
+
+        run("hdiutil", "detach", "-force", mnt)
+
+
+def _decode_sandbox_profiles(kernel_output: Path, output: Path, profile_type: Optional[str] = None) -> None:
+    args: list[Union[str, Path]] = ["sb", "list", kernel_output]
+    if profile_type is not None:
+        args += ["--type", profile_type]
+
+    output.mkdir(exist_ok=True, parents=True)
+    profile_names = run("ipsw", *args).splitlines()
+
+    def decode_worker(profile_name: str) -> None:
+        # Not with_suffix(): it would cut a dotted name short, and com.apple.cloudd would share
+        # com.apple.sb with every other com.apple.* profile
+        profile_path = output / f"{profile_name}.sb"
+        decode_args: list[Union[str, Path]] = ["sb", "dec", kernel_output, profile_name]
+        if profile_type is not None:
+            decode_args += ["--type", profile_type]
+        try:
+            profile = run("ipsw", *decode_args)
+        except ProcessExecutionError as e:
+            logger.warning(f"failed to decode sandbox profile {profile_name}: {e}")
+            return
+        profile_path.write_text(profile)
+
+    with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        futures = [
+            executor.submit(
+                decode_worker,
+                profile_name,
+            )
+            for profile_name in profile_names
+        ]
+        for future in as_completed(futures):
+            future.result()
+
+
+def _extract_kernelcache(build_identity: "BuildIdentity", output: Path) -> Path:
+    kernel_component = build_identity.get_component("KernelCache")
+    kernel_path = Path(kernel_component.path)
+    kernel_output = output / kernel_path.parts[-1]
+    output.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"extracting kernel into: {kernel_output}")
+    kernel_output.write_bytes(_im4p_payload(kernel_component.data))
+    try:
+        # In case the kernel is a FAT image, extract the arm64 macho
+        run("ipsw", "macho", "lipo", "-a", "arm64", kernel_output)
+        next(iter(kernel_output.parent.glob("*.arm64"))).rename(kernel_output)
+    except ProcessExecutionError:
+        pass
+
+    return kernel_output
+
+
+def _im4p_payload(data: bytes) -> bytes:
+    """Return the decompressed payload of an IM4P."""
+    payload = IM4P(data).payload
+    if payload is None:
+        raise ValueError("The IM4P carries no payload.")
+    payload.decompress()
+    return payload.output().data
+
+
+class BuildIdentity(UserDict[str, Any]):
+    """Dictionary-backed wrapper for a single build identity."""
+
+    def __init__(self, build_manifest: "BuildManifest", data: dict[str, Any]):
+        """Wrap a single BuildIdentity entry from the manifest."""
+        super().__init__(data)
+        self.build_manifest = build_manifest
+
+    @cached_property
+    def device_class(self) -> str:
+        """Return the normalized device class for this build identity."""
+        return self["Info"]["DeviceClass"].lower()
+
+    @cached_property
+    def restore_behavior(self) -> Optional[str]:
+        """Return the restore behavior declared by the build identity."""
+        return self["Info"].get("RestoreBehavior")
+
+    @cached_property
+    def variant(self) -> Optional[str]:
+        """Return the variant string for this build identity."""
+        return self["Info"].get("Variant")
+
+    @cached_property
+    def macos_variant(self) -> Optional[str]:
+        """Return the macOS restore variant, if present."""
+        return self["Info"].get("MacOSVariant")
+
+    @cached_property
+    def manifest(self) -> dict[str, Any]:
+        """Return the component manifest dictionary."""
+        return self["Manifest"]
+
+    @cached_property
+    def minimum_system_partition(self) -> Optional[int]:
+        """Return the minimum system partition requirement, if present."""
+        return self["Info"].get("MinimumSystemPartition")
+
+    def get_component_path(self, component: str) -> str:
+        """Return the archive path for a named component."""
+        return self.manifest[component]["Info"]["Path"]
+
+    def has_component(self, name: str) -> bool:
+        """Return whether the build identity contains a named component."""
+        return name in self.manifest
+
+    def get_component(
+        self,
+        name: str,
+        tss: Optional[SupportsPathByEntry] = None,
+        data: Optional[bytes] = None,
+        path: Optional[str] = None,
+    ) -> Component:
+        """Return a component wrapper for a named manifest entry."""
+        return Component(self, name, tss=tss, data=data, path=path)
+
+    def extract_dsc(self, output: Path, pem_db: Optional[str] = None, split: bool = True) -> None:
+        """Extract the system cryptex DSC payloads into ``output``."""
+        build_identity = self.build_manifest.build_identities[0]
+        if not build_identity.has_component("Cryptex1,SystemOS"):
+            return
+
+        device_support_symbols_path = output / "private/preboot/Cryptexes/OS/System"
+        device_support_symbols_path.mkdir(parents=True, exist_ok=True)
+
+        with TemporaryDirectory() as temp_dir:
+            system_os = Path(temp_dir) / "system_os.dmg"
+            system_os_component_path = build_identity.get_component_path("Cryptex1,SystemOS")
+            extract_as(self.build_manifest.ipsw.archive, system_os_component_path, system_os)
+            _extract_dmg(system_os, device_support_symbols_path, sub_path=Path("System"), pem_db=pem_db)
+        if split:
+            split_dsc(output)
+
+    def get_kernelcache_payload(self, arch: Optional[str] = None) -> bytes:
+        """Return the decompressed kernelcache payload, optionally sliced by arch."""
+        payload = _im4p_payload(self.build_manifest.build_identities[0].get_component("KernelCache").data)
+        if arch is None:
+            return payload
+
+        with TemporaryDirectory() as temp_dir:
+            kernel_output = Path(temp_dir) / "kernel"
+            kernel_output.write_bytes(payload)
+            run("ipsw", "macho", "lipo", "-a", arch, kernel_output)
+            return Path(next(kernel_output.parent.glob(f"*.{arch}"))).read_bytes()
+
+    def extract_sandbox_profiles(self, output: Path) -> None:
+        """Decode normal and protobox sandbox profiles into ``output``."""
+        output.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory() as temp_dir:
+            kernel_output = _extract_kernelcache(self, Path(temp_dir))
+            _decode_sandbox_profiles(kernel_output, output)
+            _decode_sandbox_profiles(kernel_output, output / "protobox", profile_type="protobox")
+
+    def extract(self, output: Path, pem_db: Optional[str] = None) -> None:
+        """Extract the build identity contents into a filesystem layout."""
+        logger.info(f"extracting into: {output}")
+
+        build_identity = self.build_manifest.build_identities[0]
+
+        logger.info(f"extracting OS into: {output}")
+        with TemporaryDirectory() as temp_dir:
+            os_dmg = Path(temp_dir) / "os.dmg"
+            os_component_path = build_identity.get_component_path("OS")
+            extract_as(self.build_manifest.ipsw.archive, os_component_path, os_dmg)
+            _extract_dmg(os_dmg, output, pem_db=pem_db)
+
+        kernel_output = _extract_kernelcache(self, output / "System/Library/Caches/com.apple.kernelcaches")
+        sandbox_profiles = output / "sandbox/profiles"
+
+        try:
+            _decode_sandbox_profiles(kernel_output, sandbox_profiles)
+        except ProcessExecutionError as e:
+            logger.error("Failed to extract sandbox profiles: %s", e)
+        try:
+            _decode_sandbox_profiles(kernel_output, sandbox_profiles / "protobox", profile_type="protobox")
+        except (ProcessExecutionError, FileNotFoundError, OSError) as e:
+            logger.error("Failed to extract sandbox profiles: %s", e)
+
+        for cryptex in ("App", "OS"):
+            name = {
+                "App": "Cryptex1,AppOS",
+                "OS": "Cryptex1,SystemOS",
+            }[cryptex]
+
+            if not build_identity.has_component(name):
+                continue
+
+            cryptex_path = output / "private/preboot/Cryptexes" / cryptex
+            cryptex_path.mkdir(parents=True, exist_ok=True)
+
+            logger.info(f"extracting {name} into: {cryptex_path}")
+            with TemporaryDirectory() as temp_dir:
+                temp_component = (Path(temp_dir) / name).with_suffix(".dmg")
+                component_path = build_identity.get_component_path(name)
+                extract_as(self.build_manifest.ipsw.archive, component_path, temp_component)
+                _extract_dmg(temp_component, cryptex_path, pem_db=pem_db)
+
+        split_dsc(output)

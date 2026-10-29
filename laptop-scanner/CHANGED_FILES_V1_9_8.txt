@@ -1,0 +1,12 @@
+D Apply-Scanner-v1.9.7.cmd
+D Apply-Scanner-v1.9.7.ps1
+A Apply-Scanner-v1.9.8.cmd
+A Apply-Scanner-v1.9.8.ps1
+A CHANGED_FILES_V1_9_8.txt
+A RELEASE_V1_9_8_ONE_IP_DOES_NOT_FAIL_THE_JOB.md
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/main.py
+A scanner-agent/tests/test_failed_ip_rows_v198.py
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py

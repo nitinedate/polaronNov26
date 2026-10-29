@@ -1,0 +1,30 @@
+New
+  backend/app/parsers/rfc822_validate.py
+  backend/app/parsers/binary_fragment.py
+  backend/app/parsers/mapi_msg_ole.py
+  backend/app/services/artifact_parsed_view.py
+  backend/app/services/artifact_locator.py
+  migrations/045_artifact_open_performance.sql
+  backend/tests/test_artifact_open_parsers_20261022.py
+  tests/test_processing_profile_selection_20261022.py
+  DEEP_PROFILE_CARVED_EML_ARTIFACT_OPEN_FIX_20261022.md
+  DEEP_PROFILE_CARVED_EML_TEST_RESULTS_20261022.txt
+  CHANGED_FILES_20261022.txt
+Modified
+  backend/app/parsers/outlook_msg_parser.py
+  backend/app/routers/artifacts.py
+  backend/app/routers/jobs.py
+  backend/app/schemas/forensic.py
+  backend/app/services/artifact_preview.py
+  backend/app/services/carved_artifact_content.py
+  backend/app/services/processing_profile.py
+  backend/app/services/signature_carve_inventory.py
+  frontend/src/components/forensic/ArtifactPreviewPanel.tsx
+  frontend/src/components/forensic/HostEvidencePanel.tsx
+  frontend/src/lib/forensicApi.ts
+  frontend/src/lib/types/forensic.ts
+  frontend/src/pages/forensic/JobDetailPage.tsx
+  scripts/apply_migrations.ps1
+  scripts/apply_migrations.sh
+  tests/test_disk_browse_dialog_not_auto_opened.py
+  tests/test_standard_deep_profiles.py

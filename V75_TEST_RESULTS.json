@@ -1,0 +1,16 @@
+{
+  "version": "V75",
+  "compose_files_scanned": 25,
+  "duplicate_mapping_failures": 0,
+  "root_service_count_checks": "passed",
+  "mobile_android_service_count_checks": "passed",
+  "mobile_ios_service_count_checks": "passed",
+  "mobile_extract_service_count_checks": "passed",
+  "docker_compose_config_executed": false,
+  "docker_compose_config_reason": "Docker CLI is not installed in the validation environment",
+  "unrelated_legacy_dynamic_drive_tests": {
+    "passed": 9,
+    "failed": 6,
+    "note": "Existing unrelated assertions about older drive-mount scripts/UI; not caused by V75 compose cleanup."
+  }
+}

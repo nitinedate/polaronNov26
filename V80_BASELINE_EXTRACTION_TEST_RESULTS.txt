@@ -1,0 +1,141 @@
+...........................F.......F.FFF...                              [100%]
+=================================== FAILURES ===================================
+___________________ test_live_device_external_tool_required ____________________
+
+    def test_live_device_external_tool_required():
+        cap = evaluate_mobile_capability(mobile_os="android", live_device=True)
+>       assert cap["capability_label"] == "EXTERNAL_TOOL_REQUIRED"
+E       AssertionError: assert 'DEVICE_UNLOCK_REQUIRED' == 'EXTERNAL_TOOL_REQUIRED'
+E         
+E         - EXTERNAL_TOOL_REQUIRED
+E         + DEVICE_UNLOCK_REQUIRED
+
+tests/test_mobile_extraction_os.py:72: AssertionError
+___________ test_forensic_drops_winsxs_dll_keeps_media_and_evidence ____________
+
+    def test_forensic_drops_winsxs_dll_keeps_media_and_evidence():
+        skip, reason = resolve_skip_system_paths(
+            mode="forensic",
+            extract_skip_system_paths=False,
+            os_family="windows",
+        )
+        assert reason == "forensic_mode_selective_include"
+    
+        assert matches_forensic_include("Users/Bob/Documents/report.pdf")
+        assert matches_forensic_include("Windows/System32/winevt/Logs/Security.evtx")
+        assert matches_forensic_include("Windows/System32/config/SOFTWARE")
+        assert matches_forensic_include("Windows/Prefetch/NOTEPAD.EXE-12345678.pf")
+        assert matches_forensic_include("Program Files/WindowsApps/Foo/photo.jpg")
+        assert matches_forensic_include("Windows/WinSxS/amd64_foo/photo.png")
+    
+        assert not matches_forensic_include("Windows/WinSxS/amd64_microsoft/foo.dll")
+        assert not matches_forensic_include("Windows/System32/driverstore/FileRepository/x/y.sys")
+        assert not matches_forensic_include("Windows/Fonts/arial.ttf")
+    
+        ok, why = should_extract_node(
+            "Windows/WinSxS/amd64_microsoft/foo.dll",
+            4096,
+            mode="forensic",
+            max_file_bytes=0,
+            os_family="windows",
+        )
+>       assert ok is False and why == "forensic_filter"
+E       assert (True is False)
+
+tests/test_os_aware_extract.py:91: AssertionError
+________ test_defensible_includes_uncertain_user_and_programdata_files _________
+
+    def test_defensible_includes_uncertain_user_and_programdata_files():
+        skip, reason = resolve_skip_system_paths(
+            mode="defensible",
+            extract_skip_system_paths=False,
+            os_family="windows",
+        )
+        assert reason == "defensible_mode_selective_include"
+    
+        # Forensic skips WinSxS DLL; defensible still skips large system DLLs but keeps unknowns
+        assert not matches_defensible_include(
+            "Windows/WinSxS/amd64_microsoft/foo.dll", size_bytes=4096
+        )
+        assert matches_defensible_include(
+            "Windows/WinSxS/amd64_microsoft/unknown_payload", size_bytes=2048
+        )
+    
+        # User profile — extensionless / unknown always kept
+        assert matches_defensible_include("Users/Bob/AppData/Local/Temp/unknown", size_bytes=512)
+        assert matches_defensible_include("Users/Bob/AppData/Roaming/noext", size_bytes=100)
+    
+        # ProgramData — configs and small unknown binaries
+        assert matches_defensible_include("ProgramData/Vendor/config", size_bytes=256)
+        assert matches_defensible_include("ProgramData/Startup/suspicious.bin", size_bytes=65536)
+    
+        ok, why = should_extract_node(
+            "Users/Bob/AppData/Local/Temp/unknown",
+            512,
+            mode="defensible",
+            max_file_bytes=0,
+            os_family="windows",
+        )
+        assert ok and why is None
+    
+        # Regenerable cache bodies are not evidence, including in defensible mode.
+        ok, why = should_extract_node(
+            "Users/Bob/AppData/Local/Google/Chrome/User Data/Default/Cache/data_0",
+            4096,
+            mode="defensible",
+            max_file_bytes=0,
+            os_family="windows",
+        )
+>       assert ok is False and why == "defensible_filter"
+E       assert (True is False)
+
+tests/test_os_aware_extract.py:163: AssertionError
+_____________________ test_minimal_skip_still_drops_extend _____________________
+
+    def test_minimal_skip_still_drops_extend():
+        ok, reason = should_extract_node(
+            "$Extend/$UsnJrnl:$J",
+            1024,
+            mode="full",
+            max_file_bytes=0,
+            skip_system_paths=False,
+            os_family="windows",
+        )
+>       assert ok is False
+E       assert True is False
+
+tests/test_os_aware_extract.py:192: AssertionError
+___________ test_forensic_keeps_browser_and_chat_evidence_not_cache ____________
+
+    def test_forensic_keeps_browser_and_chat_evidence_not_cache():
+        assert matches_forensic_include(
+            "Users/Bob/AppData/Local/Google/Chrome/User Data/Profile 1/Favicons"
+        )
+        assert matches_forensic_include(
+            "Users/Bob/AppData/Local/Google/Chrome/User Data/Profile 1/Top Sites"
+        )
+        assert matches_forensic_include(
+            "Users/Bob/AppData/Roaming/discord/Local Storage/leveldb/000003.log"
+        )
+        assert matches_forensic_include(
+            "Users/Bob/AppData/Roaming/Mozilla/Firefox/Profiles/abc123/places.sqlite"
+        )
+    
+        ok, why = should_extract_node(
+            "Users/Bob/AppData/Local/Google/Chrome/User Data/Default/Cache/data_0",
+            4096,
+            mode="forensic",
+            max_file_bytes=0,
+            os_family="windows",
+        )
+>       assert ok is False and why == "forensic_filter"
+E       assert (True is False)
+
+tests/test_os_aware_extract.py:217: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mobile_extraction_os.py::test_live_device_external_tool_required
+FAILED tests/test_os_aware_extract.py::test_forensic_drops_winsxs_dll_keeps_media_and_evidence
+FAILED tests/test_os_aware_extract.py::test_defensible_includes_uncertain_user_and_programdata_files
+FAILED tests/test_os_aware_extract.py::test_minimal_skip_still_drops_extend
+FAILED tests/test_os_aware_extract.py::test_forensic_keeps_browser_and_chat_evidence_not_cache
+5 failed, 38 passed in 0.65s

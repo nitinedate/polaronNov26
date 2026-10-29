@@ -1,0 +1,54 @@
+Polaron 2026-10-21 — Standard/Deep profile + stage-9 inventory stall fix — verification results
+Environment: Python 3.12.3, PostgreSQL 16 (local scratch), Node/tsc from frontend package-lock
+
+1. Compile: every modified/new backend module — python -m py_compile: OK
+
+2. New focused tests
+   backend: 101 passed in 1.05s
+   root contracts: 10 passed in 0.26s
+   URL zero-count test confirmed to FAIL against the original condition and PASS with the fix.
+
+3. Live PostgreSQL validation (backend/scripts/validate_inventory_sql_20261021.py)
+   PASS  registry: VSS copy (same SHA, case-insensitive) counted once          
+   PASS  registry: latest parse per artifact only (no superseded duplicates)   
+   PASS  registry: hive kinds resolved                                         
+   PASS  registry: setupapi kind                                               
+   PASS  registry: only unparsed hive read live                                
+   PASS  registry: non-indexed record types excluded                           
+   PASS  USB Devices = USBSTOR + SetupAPI device                               
+   PASS  RDP count                                                             
+   PASS  Feature Usage count                                                   
+   PASS  Installed programs MS / non-MS                                        
+   PASS  USB usage events from index                                           
+   PASS  email aggregate: outlook_message=3                                    
+   PASS  email aggregate: count field honoured (windows_mail_message=5)        
+   PASS  email aggregate: outlook_task=1                                       
+   PASS  MIME: .eml rows still scanned                                         
+   PASS  MIME: stage-5 email_mime hit kept                                     
+   PASS  MIME: unparsed file kept as candidate                                 
+   PASS  MIME: previously validated message scanned exactly once               
+   PASS  MIME: parsed non-RFC822 binary excluded                               
+   PASS  profile: job reads as standard                                        
+   PASS  media: user + recycle bin in scope                                    
+   PASS  media: earlier Deep vendor observation not counted in Standard total  
+   PASS  census: second call reuses stored census (no rewrite)                 
+   PASS  census: recomputed when file count changes                            
+   PASS  jump lists: parser_name predicate returns records                     
+   
+   25/25 live SQL checks passed
+
+4. Full regression — backend/tests + tests, run on ORIGINAL upload and on MODIFIED tree, same environment, --timeout=20
+   original : 224 failed, 1860 passed, 9 skipped, 5 warnings, 23 errors in 97.91s (0:01:37)
+   modified : 224 failed, 1968 passed, 9 skipped, 5 warnings, 23 errors in 114.97s (0:01:54)
+   Tests failing on modified but passing on original: 0
+   (The 224 failures / 23 errors are pre-existing in the original upload: missing Magnet AXIOM CSV,
+    live Redis/Postgres/Neo4j dependencies, obsolete assertions. Identical set before and after.)
+   One original test was deliberately updated: test_forensic_serial_pipeline.py::
+   test_serial_enrichment_reads_records_after_legacy_sample_cap now sets FORENSIC_ENRICH_FULL_TEXT=true
+   (full-corpus entity counting is opt-in); test_serial_enrichment_samples_by_default pins the new default.
+
+5. Frontend: node_modules/.bin/tsc -b (strict, as used by npm run build): exit 0, no diagnostics.
+   Sanity check: an injected type error in SerialPipelineBanner.tsx was reported (TS2339), then reverted.
+
+NOT verified: real E01/E02 extraction, MinIO shard throughput, Celery/Redis/Neo4j/GPU, query plans on
+production-size tables, end-to-end timings, Vite production bundle, report PDF/DOCX output.

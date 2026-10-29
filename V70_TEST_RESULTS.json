@@ -1,0 +1,13 @@
+{
+  "version": "V70",
+  "feature": "Evidence tree and existing-acquisition decryption readiness",
+  "focused_backend_tests": {"passed": 40, "failed": 0},
+  "python_compile": "passed",
+  "frontend_typescript_build": "not_run_node_modules_missing",
+  "notes": [
+    "Evidence subtree families added for WhatsApp images/videos/audio/documents/key material",
+    "Package-only inventory counts the same source-specific families",
+    "decryption_keys.txt now includes existing-acquisition readiness and conservative reacquisition recommendation",
+    "Raw secret values remain confined to the private decryption sidecar and are not exposed through artifact-board metadata"
+  ]
+}

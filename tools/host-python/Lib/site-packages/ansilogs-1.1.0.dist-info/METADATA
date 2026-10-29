@@ -1,0 +1,102 @@
+Metadata-Version: 2.4
+Name: ansilogs
+Version: 1.1.0
+Summary: Colored, single-line log output for command-line tools: a dependency-free coloredlogs.install() replacement
+Author-email: doronz88 <doron88@gmail.com>
+Maintainer-email: doronz88 <doron88@gmail.com>
+License: MIT License
+        
+        Copyright (c) 2026 doronz88
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Project-URL: Homepage, https://github.com/doronz88/ansilogs
+Project-URL: Bug Reports, https://github.com/doronz88/ansilogs/issues
+Keywords: logging,color,ansi,terminal,cli
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Topic :: System :: Logging
+Classifier: Typing :: Typed
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
+Dynamic: license-file
+
+# ansilogs
+
+Colored, single-line log output for command-line tools. A small, dependency-free replacement
+for `coloredlogs.install()`.
+
+```python
+import logging
+
+import ansilogs
+
+ansilogs.install(logging.DEBUG)
+logging.getLogger(__name__).warning("careful")
+```
+
+```
+2026-10-19 09:35:12 my-host my_tool.cli[4242] WARNING careful
+```
+
+- One line per record: `<time> <host> <name>[<pid>] <LEVEL> <message>`; tracebacks follow
+  uncolored.
+- The default style dims the time, host and pid, shows the logger name in cyan and the level name
+  in its severity color (debug output dimmed). `style="coloredlogs"` reproduces coloredlogs' look
+  byte for byte.
+- Colors only when stderr is a terminal. `NO_COLOR` (non-empty) disables them, `FORCE_COLOR`
+  (non-empty) forces them. On Windows the console is switched to ANSI processing; if that
+  fails, output is plain.
+- Records go to whatever `sys.stderr` is at the time (test capture and live progress displays
+  that redirect stderr keep working).
+
+## API
+
+- `install(level=logging.INFO, colors=None, style="default")`: attach the handler to the root
+  logger (once) and show records from `level` up. `colors=None` means `supports_color()`;
+  `style` is `"default"` or `"coloredlogs"` (see `STYLES`).
+- `set_level(level)`: change the shown level (installs the handler if needed).
+- `supports_color(stream=None)`: the color decision used by `install()`.
+- `ColoredFormatter(colors=True, hostname=None, style="default")` and `StderrHandler` for custom
+  setups.
+
+## Migrating from coloredlogs
+
+```diff
+-import coloredlogs
+-coloredlogs.install(level=logging.DEBUG)
++import ansilogs
++ansilogs.install(logging.DEBUG)
+```
+
+Pass `style="coloredlogs"` to keep the exact coloredlogs colors. `coloredlogs.set_level(level)`
+becomes `ansilogs.set_level(level)`. `COLOREDLOGS_*` environment variables and custom field/level
+styles are not supported.

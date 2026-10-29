@@ -1,0 +1,12 @@
+D Apply-Scanner-v1.9.8.cmd
+D Apply-Scanner-v1.9.8.ps1
+A Apply-Scanner-v1.9.9.cmd
+A Apply-Scanner-v1.9.9.ps1
+A CHANGED_FILES_V1_9_9.txt
+A RELEASE_V1_9_9_RESUME_KEEPS_EARLIER_IPS.md
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/main.py
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py
+A scanner-agent/tests/test_resume_prior_assessed_v199.py

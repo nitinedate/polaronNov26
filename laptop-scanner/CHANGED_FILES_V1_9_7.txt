@@ -1,0 +1,15 @@
+M .env.example
+D Apply-Scanner-v1.9.6.cmd
+D Apply-Scanner-v1.9.6.ps1
+A Apply-Scanner-v1.9.7.cmd
+A Apply-Scanner-v1.9.7.ps1
+A CHANGED_FILES_V1_9_7.txt
+A RELEASE_V1_9_7_MULTI_IP_AND_SILENT_HOSTS.md
+M docker-compose.yml
+M scanner-agent/agent/__init__.py
+M scanner-agent/agent/main.py
+M scanner-agent/agent/scan_performance.py
+M scanner-agent/agent/target_progress.py
+M scanner-agent/tests/test_no_false_clean_v157.py
+M scanner-agent/tests/test_no_nexus_budget_v163.py
+A scanner-agent/tests/test_silent_host_and_parallel_v197.py

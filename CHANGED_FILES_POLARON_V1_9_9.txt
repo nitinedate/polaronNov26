@@ -1,0 +1,15 @@
+A CHANGED_FILES_POLARON_V1_9_9.txt
+M backend/app/services/scanner_agent_jobs.py
+A backend/tests/test_resume_earlier_attempt_v199.py
+D laptop-scanner/Apply-Scanner-v1.9.8.cmd
+D laptop-scanner/Apply-Scanner-v1.9.8.ps1
+A laptop-scanner/Apply-Scanner-v1.9.9.cmd
+A laptop-scanner/Apply-Scanner-v1.9.9.ps1
+A laptop-scanner/CHANGED_FILES_V1_9_9.txt
+A laptop-scanner/RELEASE_V1_9_9_RESUME_KEEPS_EARLIER_IPS.md
+M laptop-scanner/docker-compose.yml
+M laptop-scanner/scanner-agent/agent/__init__.py
+M laptop-scanner/scanner-agent/agent/main.py
+M laptop-scanner/scanner-agent/tests/test_no_false_clean_v157.py
+M laptop-scanner/scanner-agent/tests/test_no_nexus_budget_v163.py
+A laptop-scanner/scanner-agent/tests/test_resume_prior_assessed_v199.py

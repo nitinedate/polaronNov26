@@ -1,0 +1,366 @@
+[
+  {
+    "id": 1,
+    "service": "SMB_CIFS",
+    "tcp": "445,139",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 2,
+    "service": "RPC",
+    "tcp": "135",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 3,
+    "service": "WMI",
+    "tcp": "135",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 4,
+    "service": "WINRM",
+    "tcp": "5985,5986",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 5,
+    "service": "RDP",
+    "tcp": "3389",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 6,
+    "service": "SSH_OPENSSH_DROPBEAR",
+    "tcp": "22",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 7,
+    "service": "FTP_FTPS",
+    "tcp": "20,21,990",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 8,
+    "service": "SFTP",
+    "tcp": "22",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 9,
+    "service": "HTTP",
+    "tcp": "80,8080,8000",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 10,
+    "service": "HTTPS_TLS",
+    "tcp": "443,8443",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 11,
+    "service": "SMTP_SMTPS",
+    "tcp": "25,465,587",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 12,
+    "service": "POP3_POP3S",
+    "tcp": "110,995",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 13,
+    "service": "IMAP_IMAPS",
+    "tcp": "143,993",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 14,
+    "service": "DNS",
+    "tcp": "53",
+    "udp": "53",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 15,
+    "service": "SNMP",
+    "tcp": "",
+    "udp": "161",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 16,
+    "service": "TELNET",
+    "tcp": "23",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 17,
+    "service": "TFTP",
+    "tcp": "",
+    "udp": "69",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 18,
+    "service": "LDAP",
+    "tcp": "389",
+    "udp": "389",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 19,
+    "service": "LDAPS",
+    "tcp": "636",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 20,
+    "service": "KERBEROS",
+    "tcp": "88",
+    "udp": "88",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 21,
+    "service": "AD_GLOBAL_CATALOG",
+    "tcp": "3268,3269",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 22,
+    "service": "MSSQL",
+    "tcp": "1433",
+    "udp": "1434",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 23,
+    "service": "MYSQL_MARIADB",
+    "tcp": "3306",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 24,
+    "service": "POSTGRESQL",
+    "tcp": "5432",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 25,
+    "service": "ORACLE_DB",
+    "tcp": "1521",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 26,
+    "service": "MONGODB",
+    "tcp": "27017",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 27,
+    "service": "REDIS",
+    "tcp": "6379",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 28,
+    "service": "ELASTICSEARCH",
+    "tcp": "9200,9300",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 29,
+    "service": "VNC",
+    "tcp": "5900-5909",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 30,
+    "service": "VMWARE_ESXI_VCENTER",
+    "tcp": "443,902",
+    "udp": "902",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 31,
+    "service": "DOCKER_API",
+    "tcp": "2375,2376",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 32,
+    "service": "KUBERNETES_API",
+    "tcp": "6443",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 33,
+    "service": "KUBELET",
+    "tcp": "10250",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 34,
+    "service": "JENKINS",
+    "tcp": "8080",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 35,
+    "service": "GITLAB_GIT",
+    "tcp": "22,80,443,9418",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 36,
+    "service": "RABBITMQ",
+    "tcp": "5672,15672",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 37,
+    "service": "KAFKA",
+    "tcp": "9092",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 38,
+    "service": "MEMCACHED",
+    "tcp": "11211",
+    "udp": "11211",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 39,
+    "service": "TOMCAT",
+    "tcp": "8080,8443",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 40,
+    "service": "JBOSS_WILDFLY",
+    "tcp": "8080,9990",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 41,
+    "service": "IIS",
+    "tcp": "80,443",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 42,
+    "service": "APACHE_HTTPD",
+    "tcp": "80,443",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 43,
+    "service": "NGINX",
+    "tcp": "80,443",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 44,
+    "service": "WEBLOGIC",
+    "tcp": "7001,7002",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 45,
+    "service": "WEBSPHERE",
+    "tcp": "",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 46,
+    "service": "IPSEC_IKE",
+    "tcp": "",
+    "udp": "500,4500",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 47,
+    "service": "NTP",
+    "tcp": "",
+    "udp": "123",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 48,
+    "service": "DHCP",
+    "tcp": "",
+    "udp": "67,68",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 49,
+    "service": "IPP",
+    "tcp": "631",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 50,
+    "service": "JETDIRECT",
+    "tcp": "9100",
+    "udp": "",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 51,
+    "service": "NFS",
+    "tcp": "2049",
+    "udp": "2049",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  },
+  {
+    "id": 52,
+    "service": "RPCBIND",
+    "tcp": "111",
+    "udp": "111",
+    "routing_status": "Configuration only - check-specific proof not validated"
+  }
+]

@@ -1,0 +1,21 @@
+# Safe bootstrap template: only C:/ is mounted.
+# Replaced on every launcher start using live Windows+Docker drive probes.
+# Other evidence drives are added ONLY after Docker verifies they are accessible.
+
+services:
+  api:
+    volumes:
+      - type: bind
+        source: 'C:/'
+        target: '/host/c'
+        read_only: true
+        bind:
+          create_host_path: false
+  worker-mobile:
+    volumes:
+      - type: bind
+        source: 'C:/'
+        target: '/host/c'
+        read_only: true
+        bind:
+          create_host_path: false

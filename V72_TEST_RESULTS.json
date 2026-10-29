@@ -1,0 +1,13 @@
+{
+  "version": "V72",
+  "focused_tests": 48,
+  "focused_failures": 0,
+  "python_compileall": "passed",
+  "compose_yaml": {
+    "docker-compose.yml": "passed",
+    "docker-compose.https.yml": "passed",
+    "services/mobile-android/docker-compose.yml": "passed",
+    "services/mobile-ios/docker-compose.yml": "passed"
+  },
+  "environment_note": "A broader legacy recovery subset had host-interpreter dependency gaps for Crypto and psycopg2; focused V72/V71/V70/V69 and WhatsApp parser/decryption tests passed."
+}

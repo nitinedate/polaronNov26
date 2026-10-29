@@ -1,0 +1,27 @@
+{
+  "version": "V53",
+  "objective": "60 GB evidence-ready target in 30-35 minutes on capable storage without reducing forensic coverage",
+  "validation": {
+    "focused_pytest": {
+      "command": "python -m pytest -q tests/test_disk_performance_v53.py tests/test_host_capacity.py",
+      "passed": 13,
+      "failed": 0
+    },
+    "python_compile": {
+      "status": "passed",
+      "files": [
+        "backend/app/services/extracted_disk.py",
+        "backend/app/services/extract_shard_v45.py",
+        "backend/app/services/storage.py",
+        "backend/app/services/host_capacity.py",
+        "backend/app/config.py",
+        "backend/scripts/verify_60gb_sla_v53.py"
+      ]
+    },
+    "compose_yaml_parse": {
+      "status": "passed",
+      "files": ["docker-compose.yml", "docker-compose.https.yml"]
+    }
+  },
+  "not_claimed": "No physical 60 GB end-to-end benchmark was run in this execution environment; final SLA depends on source media, USB/SATA/NVMe path, scratch storage and MinIO throughput. Use verify_60gb_sla_v53.py on the deployment host."
+}

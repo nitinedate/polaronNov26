@@ -1,0 +1,15 @@
+{
+  "version": "V76",
+  "focus": "WhatsApp dependency pin/build fix",
+  "checks": {
+    "v72_whatsapp_external_deleted_recovery_tests": "9 passed",
+    "python_compile": "passed",
+    "compose_duplicate_key_audit": "25 files passed",
+    "pypi_verification": "wa-crypt-tools 0.1.0 exists and provides wadecrypt; 0.2.0 is not published on PyPI"
+  },
+  "environment_limited_broader_tests": {
+    "status": "not fully runnable in host test environment",
+    "missing_modules": ["Crypto", "psycopg2"],
+    "note": "These are runtime dependencies of the Docker/backend environment and are unrelated to the V76 requirement pin change."
+  }
+}

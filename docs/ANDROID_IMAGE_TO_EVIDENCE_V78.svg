@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="565" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 565" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="565"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-565)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="2" y="510" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="537" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,1074) scale(1,-1)">1. Receive image / preflight</text>
+			<text x="12" y="525" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,1050) scale(1,-1)">Case, custodian, scope, SHA-256</text>
+			<rect x="2" y="456" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="483" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,966) scale(1,-1)">2. Prepare and extract image</text>
+			<text x="12" y="471" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,942) scale(1,-1)">Finalize parts, manifest and exceptions</text>
+			<path d="M 135,510 L 135,499 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 499, 132 505, 138 505" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="402" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="429" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,858) scale(1,-1)">3. Register evidence + WhatsApp gate</text>
+			<text x="12" y="417" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,834) scale(1,-1)">Keep originals; decrypt only with valid keys</text>
+			<path d="M 135,456 L 135,445 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 445, 132 451, 138 451" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="348" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="375" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,750) scale(1,-1)">4. Native forensic parsing</text>
+			<text x="12" y="363" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,726) scale(1,-1)">Messages, email, files, SQLite + WAL</text>
+			<path d="M 135,402 L 135,391 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 391, 132 397, 138 397" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="294" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="321" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,642) scale(1,-1)">5. Deleted / recovery analysis</text>
+			<text x="12" y="309" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,618) scale(1,-1)">Recoverable records; retain source state</text>
+			<path d="M 135,348 L 135,337 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 337, 132 343, 138 343" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="240" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="267" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,534) scale(1,-1)">6. Finish quality triage and GPU OCR</text>
+			<text x="12" y="255" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,510) scale(1,-1)">Drain all eligible work; preserve errors</text>
+			<path d="M 135,294 L 135,283 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 283, 132 289, 138 289" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="186" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="213" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,426) scale(1,-1)">7. Review image / video evidence</text>
+			<text x="12" y="201" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,402) scale(1,-1)">Frame/text observations; examiner review</text>
+			<path d="M 135,240 L 135,229 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 229, 132 235, 138 235" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="132" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="159" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,318) scale(1,-1)">8. Normalize, correlate, inventory</text>
+			<text x="12" y="147" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,294) scale(1,-1)">Drain helpers; run final leakage analysis</text>
+			<path d="M 135,186 L 135,175 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 175, 132 181, 138 181" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="78" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="105" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,210) scale(1,-1)">9. Chunk, enrich and graph sync</text>
+			<text x="12" y="93" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,186) scale(1,-1)">Complete text corpus; case-scoped links</text>
+			<path d="M 135,132 L 135,121 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 121, 132 127, 138 127" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="2" y="24" width="267" height="43" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="12" y="51" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,102) scale(1,-1)">10. Process agent validation</text>
+			<text x="12" y="39" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,78) scale(1,-1)">Counters + persisted queues + producers</text>
+			<path d="M 135,78 L 135,67 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1;"/>
+			<polygon points="135 67, 132 73, 138 73" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="306" y="350" width="190" height="57" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="316" y="391" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,782) scale(1,-1)">CPU quality triage</text>
+			<text x="316" y="379" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,758) scale(1,-1)">Overlaps native parsing</text>
+			<text x="316" y="367" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,734) scale(1,-1)">Late tasks stop after OCR is sealed</text>
+			<path d="M 269,371 L 306,378 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1; stroke-dasharray: 3, 3;"/>
+			<polygon points="306 378, 300 375, 300 381" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<path d="M 306,350 L 269,262 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1; stroke-dasharray: 3, 3;"/>
+			<polygon points="269 262, 275 259, 275 265" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="306" y="274" width="190" height="58" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="316" y="316" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,632) scale(1,-1)">GPU OCR sidecar</text>
+			<text x="316" y="304" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,608) scale(1,-1)">May overlap recovery</text>
+			<text x="316" y="292" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,584) scale(1,-1)">Empty bucket is not completion</text>
+			<path d="M 269,316 L 306,302 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1; stroke-dasharray: 3, 3;"/>
+			<polygon points="306 302, 300 299, 300 305" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="306" y="188" width="190" height="69" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="316" y="241" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,482) scale(1,-1)">CPU / DB helpers</text>
+			<text x="316" y="229" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,458) scale(1,-1)">Prechunk + company leakage</text>
+			<text x="316" y="217" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,434) scale(1,-1)">Inventory can overlap OCR</text>
+			<text x="316" y="205" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,410) scale(1,-1)">Token claims and bounded slots</text>
+			<path d="M 269,358 L 306,235 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1; stroke-dasharray: 3, 3;"/>
+			<polygon points="306 235, 300 232, 300 238" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<path d="M 306,206 L 269,156 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1; stroke-dasharray: 3, 3;"/>
+			<polygon points="269 156, 275 153, 275 159" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="306" y="100" width="190" height="65" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="316" y="149" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,298) scale(1,-1)">Join at stable boundaries</text>
+			<text x="316" y="137" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,274) scale(1,-1)">No active helper before final count</text>
+			<text x="316" y="125" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,250) scale(1,-1)">No active producer before report</text>
+			<text x="316" y="113" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,226) scale(1,-1)">Source writes cannot race report</text>
+			<path d="M 306,128 L 269,101 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1.1; stroke-dasharray: 3, 3;"/>
+			<polygon points="269 101, 275 98, 275 104" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="306" y="15" width="190" height="60" rx="6" ry="6" style="stroke: rgb(70%,79%,85%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(92%,96%,98%); fill-rule: evenodd;"/>
+			<text x="316" y="59" style="font-family: Strong; font-size: 8.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,118) scale(1,-1)">Source limitations remain visible</text>
+			<text x="316" y="47" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,94) scale(1,-1)">Missing key / private app data</text>
+			<text x="316" y="35" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,70) scale(1,-1)">Overwritten / inaccessible evidence</text>
+			<text x="316" y="23" style="font-family: Body; font-size: 7.5px;fill: rgb(6%,16%,26%); stroke:none;" transform="translate(0,46) scale(1,-1)">Processing 100% is not full coverage</text>
+			<text x="307" y="440" style="font-family: Body; font-size: 7.5px;fill: rgb(32%,39%,45%); stroke:none;" transform="translate(0,880) scale(1,-1)">Dashed arrows: permitted overlap</text>
+		</g>
+	</g>
+</svg>

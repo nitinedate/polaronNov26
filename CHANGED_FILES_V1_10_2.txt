@@ -1,0 +1,32 @@
+V1.10.2 = Polaron policy (default) + silent IPs no longer shown as clean scans. Agent build 1.10.2-v62.0.
+New
+  docs/POLARON_POLICY_PORT_MATRIX.xlsx
+  backend/tests/test_polaron_policy_v1102.py
+  backend/tests/test_silent_hosts_v1102.py
+  backend/tests/fixtures/polaron_report_ports.json
+  laptop-scanner/scanner-agent/agent/reachability_diagnosis.py
+  laptop-scanner/scanner-agent/tests/test_polaron_policy_v1102.py
+  laptop-scanner/scanner-agent/tests/test_reachability_diagnosis_v1102.py
+  laptop-scanner/scanner-agent/tests/polaron_report_ports.json
+  POLARON_POLICY_RELEASE_V1_10_2.md
+  POLARON_POLICY_TEST_RESULTS_V1_10_2.txt
+  SILENT_HOSTS_NOT_ASSESSED_V1_10_2.md
+  CHANGED_FILES_V1_10_2.txt
+Modified
+  backend/app/services/scan_templates.json
+  backend/app/services/scanner_service_policy.py
+  backend/app/services/builtin_scan_policies.py
+  backend/app/services/scanner_agent_jobs.py
+  backend/app/routers/vuln.py
+  backend/tests/test_service_ports_v170.py
+  frontend/src/lib/types/vuln.ts
+  frontend/src/pages/vuln/ScanJobsPage.tsx
+  frontend/src/pages/vuln/ScanPoliciesPage.tsx
+  laptop-scanner/scanner-agent/agent/scan_templates.json
+  laptop-scanner/scanner-agent/agent/service_policy.py
+  laptop-scanner/scanner-agent/agent/__init__.py
+  laptop-scanner/scanner-agent/agent/main.py
+  laptop-scanner/scanner-agent/agent/port_discovery.py
+  laptop-scanner/scanner-agent/tests/test_no_false_clean_v157.py
+  laptop-scanner/scanner-agent/tests/test_no_nexus_budget_v163.py
+  laptop-scanner/scanner-agent/tests/test_templates_v165.py

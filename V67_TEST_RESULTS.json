@@ -1,0 +1,13 @@
+{
+  "version": "V67",
+  "focused_new_tests": {"passed": 8, "failed": 0},
+  "relevant_regression_tests": {"passed": 20, "failed": 0},
+  "python_compile": "passed",
+  "compose_yaml_parse": {
+    "docker-compose.yml": "passed",
+    "services/mobile-ios/docker-compose.yml": "passed",
+    "services/mobile-android/docker-compose.yml": "passed",
+    "services/mobile-extract/docker-compose.yml": "passed"
+  },
+  "frontend_typecheck": "not completed in this build runner because npm install timed out and left @types packages incomplete; the V67 TSX change was source-reviewed and is included"
+}

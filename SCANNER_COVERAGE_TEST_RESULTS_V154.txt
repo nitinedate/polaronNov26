@@ -1,0 +1,8 @@
+Date: 2026-10-13
+Scanner pytest: 113 passed
+Backend selected pytest: 23 passed
+Compose YAML: parsed 18 main, 4 vuln, 19 laptop services
+Python changed modules: compiled
+Frontend TypeScript build: NOT RUN (npm offline dependency cache incomplete)
+Full backend tests: NOT RUN (psycopg2 unavailable)
+Live Docker, Greenbone and network probes: NOT RUN (no Docker/client LAN)

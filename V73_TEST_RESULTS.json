@@ -1,0 +1,12 @@
+{
+  "version": "V73",
+  "focus": "WhatsApp multi-path key and encrypted-backup discovery",
+  "pytest_output": "............................................................             [100%]\n60 passed in 0.54s",
+  "python_compileall": "passed",
+  "notes": [
+    "Searches multiple Android WhatsApp key locations including Android/data/com.whatsapp.",
+    "Tries all structurally valid candidates; successful cryptographic authentication wins over path priority.",
+    "Promotes discovered authorized key and source path into decryption_keys.txt when no examiner key was supplied.",
+    "Original encrypted evidence remains unchanged."
+  ]
+}

@@ -1,0 +1,33 @@
+Polaron V1.6.5 overlay — copy each file to the same path under the Polaron root.
+
+new       cf997ef1ddfdbd2ec6a63d77ff721fa5f6fab64570c57ff2f4cdc531979afe55  RELEASE_V1_6_5_COVERAGE_AND_NESSUS_POLICIES.md
+modified  329f269306a555d37c48547456fcd37297753fd1f5cbb07bed0320be48049ec3  backend/app/routers/vuln.py
+modified  5e9a1b16e9a5a045a4b06cc2dfa7c1845ca38b50a40b94ebceda6758bb24de04  backend/app/services/gap_assessment_report.py
+modified  b1cbb58dd7a3e55fd74da0548127a68a9dc6a6d0e6a1d4725b3e7e9aa40010f2  backend/app/services/scan_orchestrator.py
+new       97495a83802e9f7701d4e30fa776d894941404e848df9e797568749f8b18c4b9  backend/app/services/scan_templates.json
+modified  0b4e67b14639695b0754d551211fc52d9ba5e2c67808f995f2b0390e2913f028  backend/app/services/scanner_agent_jobs.py
+modified  e42e3e671eb059602ec536d59a119bb7dbd944618ba6aaad6868f8cf6438ac96  backend/app/services/scanner_service_policy.py
+new       57ebe4b77aa8c06bb506f4000284b2bf07e05b87da186d764256cdabddd9d5f1  backend/tests/test_scan_templates_v165.py
+modified  ae173ec2dd81346f1abd3b1b586a2ca98d493db799a76d0597f3be044a3920af  frontend/src/lib/types/vuln.ts
+modified  3f0c85de35b8899d9b4178c1ca52f924d04514d83f1b2b609c53e9f072b57c21  frontend/src/lib/vulnApi.ts
+modified  f726f79ca80342c3444c674f0854b6a6ce55db288f3f3c36810b89024b50c9a7  frontend/src/pages/vuln/ScanJobsPage.tsx
+modified  eb02df3bf95eef2e1176e4e8f14aa6a812fffa700b2f2b48acf43de5d9ddcc73  frontend/src/pages/vuln/ScanPoliciesPage.tsx
+modified  6598f68cba124fcb7b640874d0569865e96ff9dfff80171d794d9d0b1fb7932c  laptop-scanner/.env.example
+new       7a7a885e1f62b8acc1851674d751188df261725ece696f8fae4830cad47213c0  laptop-scanner/Diagnose-Report.cmd
+new       cf997ef1ddfdbd2ec6a63d77ff721fa5f6fab64570c57ff2f4cdc531979afe55  laptop-scanner/RELEASE_V1_6_5_COVERAGE_AND_NESSUS_POLICIES.md
+modified  e459969aadcb30c9e70e71c4ae83a289f82867ec448d6e517f06b9c58f4feae6  laptop-scanner/docker-compose.yml
+modified  34ce39dc8427c741ca901b851b8d6547e8155ddc518aa1b300534815859958c6  laptop-scanner/scanner-agent/agent/__init__.py
+modified  32e165df67c31ee2a0d9b771284126d20d3243ec0182bdd6b1421c14fcac5e0f  laptop-scanner/scanner-agent/agent/coverage_reconcile.py
+modified  ba7e8f421a67843d105caa881d0397da81baee0c956e9ac2991e74eb23c3022a  laptop-scanner/scanner-agent/agent/gmp_local.py
+modified  81af4e90450ea74aa8ab9815feff32aba3cf0d7153341b06406a164df384ebf4  laptop-scanner/scanner-agent/agent/main.py
+new       6b8fb802b2c99d0f0d98bc529c050cd3bf8b60412727f406cc2c910f7439348a  laptop-scanner/scanner-agent/agent/report_diagnose.py
+modified  8e58201333b1a3d7efbb887aa1f86ff04246762f69096a5d7e883a9becf23c9d  laptop-scanner/scanner-agent/agent/scan_coverage.py
+new       97495a83802e9f7701d4e30fa776d894941404e848df9e797568749f8b18c4b9  laptop-scanner/scanner-agent/agent/scan_templates.json
+modified  25ce378b6ae7f429b369e50aead706fae4c236d9462ce0f571f2fc130dcf77b6  laptop-scanner/scanner-agent/agent/service_audit.py
+modified  e42e3e671eb059602ec536d59a119bb7dbd944618ba6aaad6868f8cf6438ac96  laptop-scanner/scanner-agent/agent/service_policy.py
+new       80af5cc0e223969026936f23ff2162a5f5126bd9cdb06ab14015d6a3f79c3032  laptop-scanner/scanner-agent/tests/test_attribution_v165.py
+new       763d5216cdde10c42b6d6cb1cacf2e0d23564b576d6468ecaa0cf5efe3695750  laptop-scanner/scanner-agent/tests/test_field_d26e3145_v165.py
+modified  aacf8bbb519b5f0b470155973f2a6a1a688b6a18a9881d648f4f0bbd26682905  laptop-scanner/scanner-agent/tests/test_no_false_clean_v157.py
+modified  2deda9785b15825382e5f719a6688b4d5c7e84bcd06300d57395f6ad70ea2974  laptop-scanner/scanner-agent/tests/test_no_nexus_budget_v163.py
+modified  067b2192c6cdfb92dd513d023aba756e8aafa8285e35a86382c4b0a72d6dde27  laptop-scanner/scanner-agent/tests/test_service_coverage_safety_v154.py
+new       81252ccc6d1baf8b72b8f7d8dede7bf8c8a43ff98cc4ef914f4573980742ba10  laptop-scanner/scanner-agent/tests/test_templates_v165.py

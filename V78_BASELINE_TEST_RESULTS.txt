@@ -1,0 +1,263 @@
+...FF.F.......................F......FF....F.F..                         [100%]
+=================================== FAILURES ===================================
+____________________ test_parallelism_is_hard_capped[16-4] _____________________
+
+requested = 16, expected = 4
+
+    @pytest.mark.parametrize(
+        "requested,expected", [(1, 1), (2, 2), (4, 4), (16, 4), (64, 4), (0, 1)]
+    )
+    def test_parallelism_is_hard_capped(requested, expected):
+>       assert policy.parallelism(requested) == expected
+E       assert 9 == 4
+E        +  where 9 = <function parallelism at 0x7f6895f17740>(16)
+E        +    where <function parallelism at 0x7f6895f17740> = policy.parallelism
+
+baseline/backend/tests/test_forensic_serial_pipeline.py:50: AssertionError
+____________________ test_parallelism_is_hard_capped[64-4] _____________________
+
+requested = 64, expected = 4
+
+    @pytest.mark.parametrize(
+        "requested,expected", [(1, 1), (2, 2), (4, 4), (16, 4), (64, 4), (0, 1)]
+    )
+    def test_parallelism_is_hard_capped(requested, expected):
+>       assert policy.parallelism(requested) == expected
+E       assert 9 == 4
+E        +  where 9 = <function parallelism at 0x7f6895f17740>(64)
+E        +    where <function parallelism at 0x7f6895f17740> = policy.parallelism
+
+baseline/backend/tests/test_forensic_serial_pipeline.py:50: AssertionError
+_______________ test_work_is_bounded_and_all_items_are_processed _______________
+
+    def test_work_is_bounded_and_all_items_are_processed():
+        barrier = threading.Barrier(4, timeout=5)
+        guard = threading.Lock()
+        active = peak = 0
+    
+        def work(item):
+            nonlocal active, peak
+            with guard:
+                active += 1
+                peak = max(peak, active)
+            barrier.wait()
+            with guard:
+                active -= 1
+            return item
+    
+        assert sorted(policy.bounded_map(work, range(12), workers=32)) == list(range(12))
+>       assert peak == 4
+E       assert 6 == 4
+
+baseline/backend/tests/test_forensic_serial_pipeline.py:69: AssertionError
+____________ test_ocr_cpu_workers_are_capped_even_with_old_settings ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6893d4b650>
+
+    def test_ocr_cpu_workers_are_capped_even_with_old_settings(monkeypatch):
+        from app.services import ocr_gpu
+    
+        monkeypatch.setattr(
+            ocr_gpu, "get_settings", lambda: SimpleNamespace(ocr_cpu_workers=32)
+        )
+>       assert ocr_gpu._ocr_cpu_worker_count(gpu=True, n_items=100) == 4
+E       AssertionError: assert 9 == 4
+E        +  where 9 = <function _ocr_cpu_worker_count at 0x7f689399b1a0>(gpu=True, n_items=100)
+E        +    where <function _ocr_cpu_worker_count at 0x7f689399b1a0> = <module 'app.services.ocr_gpu' from '<review-workspace>/baseline/backend/app/services/ocr_gpu.py'>._ocr_cpu_worker_count
+
+baseline/backend/tests/test_forensic_serial_pipeline.py:377: AssertionError
+_ test_materialization_reads_unhashed_entries_and_disables_path_filter[unhashed.db] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f687bfcd250>
+second_path = 'unhashed.db'
+
+    @pytest.mark.parametrize("second_path", ["unhashed.db", "data/data/com.whatsapp/files/key"])
+    def test_materialization_reads_unhashed_entries_and_disables_path_filter(monkeypatch, second_path):
+        captured = {}
+        manifest = {"index_uri": "s3://derived/index", "parts": ["s3://derived/part"]}
+        entries = [
+            {"path": "hashed.db", "sha256": "digest", "part_id": 0},
+            {"path": second_path, "part_id": 0},
+        ]
+        monkeypatch.setattr(
+            stages,
+            "fetchone",
+            lambda *args: {"disk_source": manifest, "files_extracted": 2},
+        )
+        monkeypatch.setattr(
+            "app.services.disk_manifest.load_index_entries", lambda *args: entries
+        )
+    
+        def materialize(db, job_id, rows, **kwargs):
+            captured.update({"rows": rows, **kwargs})
+            return {"status": "ok"}
+    
+        monkeypatch.setattr(
+            "app.services.artifact_materialize.materialize_index_entries", materialize
+        )
+        monkeypatch.setattr(stages, "report_progress", lambda *args, **kwargs: None)
+        monkeypatch.setattr("psycopg2.extras.execute_values", lambda *args, **kwargs: None)
+        captured_keys = []
+        monkeypatch.setattr("app.services.mobile_forensic.key_intake.capture_registered_keys", lambda _db, jid: captured_keys.append(jid))
+    
+        @contextmanager
+        def cursor():
+            yield object()
+    
+        db = SimpleNamespace(
+            commit=lambda: None,
+            connection=lambda: SimpleNamespace(connection=SimpleNamespace(cursor=cursor)),
+        )
+>       result = stages._materialize_full(db, "00000000-0000-0000-0000-000000000001")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+baseline/backend/tests/test_forensic_serial_pipeline.py:531: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+baseline/backend/app/services/forensic_serial_stages.py:147: in _materialize_full
+    whatsapp_gate = prepare_whatsapp_evidence(
+baseline/backend/app/services/mobile_forensic/whatsapp_evidence_gate.py:248: in prepare_whatsapp_evidence
+    job = fetchone(db, "SELECT type,disk_source FROM jobs WHERE id=:jid", {"jid": job_id}) or {}
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = namespace(commit=<function test_materialization_reads_unhashed_entries_and_disables_path_filter.<locals>.<lambda> at 0...on=<function test_materialization_reads_unhashed_entries_and_disables_path_filter.<locals>.<lambda> at 0x7f686adffba0>)
+sql = 'SELECT type,disk_source FROM jobs WHERE id=:jid'
+params = {'jid': '00000000-0000-0000-0000-000000000001'}
+
+    def fetchone(db: Session, sql: str, params: tuple | dict | None = None) -> dict[str, Any] | None:
+>       row = db.execute(text(sql), params or {}).mappings().first()
+              ^^^^^^^^^^
+E       AttributeError: 'types.SimpleNamespace' object has no attribute 'execute'
+
+baseline/backend/app/db/sql_helpers.py:69: AttributeError
+_ test_materialization_reads_unhashed_entries_and_disables_path_filter[data/data/com.whatsapp/files/key] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f68920bfe90>
+second_path = 'data/data/com.whatsapp/files/key'
+
+    @pytest.mark.parametrize("second_path", ["unhashed.db", "data/data/com.whatsapp/files/key"])
+    def test_materialization_reads_unhashed_entries_and_disables_path_filter(monkeypatch, second_path):
+        captured = {}
+        manifest = {"index_uri": "s3://derived/index", "parts": ["s3://derived/part"]}
+        entries = [
+            {"path": "hashed.db", "sha256": "digest", "part_id": 0},
+            {"path": second_path, "part_id": 0},
+        ]
+        monkeypatch.setattr(
+            stages,
+            "fetchone",
+            lambda *args: {"disk_source": manifest, "files_extracted": 2},
+        )
+        monkeypatch.setattr(
+            "app.services.disk_manifest.load_index_entries", lambda *args: entries
+        )
+    
+        def materialize(db, job_id, rows, **kwargs):
+            captured.update({"rows": rows, **kwargs})
+            return {"status": "ok"}
+    
+        monkeypatch.setattr(
+            "app.services.artifact_materialize.materialize_index_entries", materialize
+        )
+        monkeypatch.setattr(stages, "report_progress", lambda *args, **kwargs: None)
+        monkeypatch.setattr("psycopg2.extras.execute_values", lambda *args, **kwargs: None)
+        captured_keys = []
+        monkeypatch.setattr("app.services.mobile_forensic.key_intake.capture_registered_keys", lambda _db, jid: captured_keys.append(jid))
+    
+        @contextmanager
+        def cursor():
+            yield object()
+    
+        db = SimpleNamespace(
+            commit=lambda: None,
+            connection=lambda: SimpleNamespace(connection=SimpleNamespace(cursor=cursor)),
+        )
+>       result = stages._materialize_full(db, "00000000-0000-0000-0000-000000000001")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+baseline/backend/tests/test_forensic_serial_pipeline.py:531: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+baseline/backend/app/services/forensic_serial_stages.py:147: in _materialize_full
+    whatsapp_gate = prepare_whatsapp_evidence(
+baseline/backend/app/services/mobile_forensic/whatsapp_evidence_gate.py:248: in prepare_whatsapp_evidence
+    job = fetchone(db, "SELECT type,disk_source FROM jobs WHERE id=:jid", {"jid": job_id}) or {}
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = namespace(commit=<function test_materialization_reads_unhashed_entries_and_disables_path_filter.<locals>.<lambda> at 0...on=<function test_materialization_reads_unhashed_entries_and_disables_path_filter.<locals>.<lambda> at 0x7f686ae2e7a0>)
+sql = 'SELECT type,disk_source FROM jobs WHERE id=:jid'
+params = {'jid': '00000000-0000-0000-0000-000000000001'}
+
+    def fetchone(db: Session, sql: str, params: tuple | dict | None = None) -> dict[str, Any] | None:
+>       row = db.execute(text(sql), params or {}).mappings().first()
+              ^^^^^^^^^^
+E       AttributeError: 'types.SimpleNamespace' object has no attribute 'execute'
+
+baseline/backend/app/db/sql_helpers.py:69: AttributeError
+_______________ test_enrich_mobile_objectives_uses_axiom_detail ________________
+
+_prompt = <MagicMock name='build_objective_evidence_prompt' id='140087141986096'>
+_linked = <MagicMock name='list_catalog_artifacts_for_objective' id='140086447720880'>
+_lookup_id = <MagicMock name='artifact_lookup_objective_id' id='140086448864912'>
+fetch_detail = <MagicMock name='_fetch_axiom_objective_detail' id='140086447714672'>
+_platform = <MagicMock name='mobile_platform_for_job' id='140086447710016'>
+
+    @patch("app.services.mobile_objective_service.mobile_platform_for_job", return_value="iOS")
+    @patch("app.services.report_template_service._fetch_axiom_objective_detail")
+    @patch("app.services.report_template_service.artifact_lookup_objective_id", return_value="O043")
+    @patch("app.services.report_objective_evidence.list_catalog_artifacts_for_objective", return_value=[])
+    @patch("app.services.report_objective_evidence.build_objective_evidence_prompt", return_value="prompt")
+    def test_enrich_mobile_objectives_uses_axiom_detail(
+        _prompt,
+        _linked,
+        _lookup_id,
+        fetch_detail,
+        _platform,
+    ):
+        fetch_detail.return_value = {
+            "objective_id": "O043",
+            "title": "Chat / Communication Apps",
+            "statement": "Recover chat messages from the device.",
+            "procedure_text": "1. Identify chat applications\n2. Parse message stores",
+            "required_observation_fields": "counts; users",
+            "expected_output_fields": "messages",
+            "minimum_corroboration": "two sources",
+            "limitations": "encrypted chats",
+        }
+        db = MagicMock()
+        objectives = [{
+            "id": "RPT-O913",
+            "title": "Chat / Communication Apps",
+            "objective": "short template",
+            "procedure_text": "short proc",
+        }]
+        out = enrich_mobile_objectives(db, "job-1", {"report_type": "mobile_forensic"}, objectives)
+        assert len(out) == 1
+        assert out[0]["objective"] == "Recover chat messages from the device."
+>       assert out[0]["procedure_text"].startswith("1.")
+E       AssertionError: assert False
+E        +  where False = <built-in method startswith of str object at 0x179b3e60>('1.')
+E        +    where <built-in method startswith of str object at 0x179b3e60> = 'The examination used the controlled AXIOM procedure(s) linked to this objective. Identify communications, participant... parsed, deleted, carved and partial records. 6. Count unique communications using native identifiers where available.'.startswith
+
+baseline/backend/tests/test_mobile_objective_service.py:60: AssertionError
+__________ test_client_objective_and_procedure_are_controlled_kb_text __________
+
+    def test_client_objective_and_procedure_are_controlled_kb_text():
+        title = "Access to Cloud Storage Services"
+>       assert format_client_objective(title) == controlled_objective_text(title)
+E       AssertionError: assert 'To examine t...age services.' == 'To examine a...idence rules.'
+E         
+E         - To examine access to cloud storage services by correlating the controlled Browser History, Browser Downloads, Cloud Files and Cloud Activity evidence and report only findings supported by the mapped primary evidence rules.
+E         + To examine the device for evidence related to access to cloud storage services.
+
+baseline/backend/tests/test_report_examination_narratives.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED baseline/backend/tests/test_forensic_serial_pipeline.py::test_parallelism_is_hard_capped[16-4]
+FAILED baseline/backend/tests/test_forensic_serial_pipeline.py::test_parallelism_is_hard_capped[64-4]
+FAILED baseline/backend/tests/test_forensic_serial_pipeline.py::test_work_is_bounded_and_all_items_are_processed
+FAILED baseline/backend/tests/test_forensic_serial_pipeline.py::test_ocr_cpu_workers_are_capped_even_with_old_settings
+FAILED baseline/backend/tests/test_forensic_serial_pipeline.py::test_materialization_reads_unhashed_entries_and_disables_path_filter[unhashed.db]
+FAILED baseline/backend/tests/test_forensic_serial_pipeline.py::test_materialization_reads_unhashed_entries_and_disables_path_filter[data/data/com.whatsapp/files/key]
+FAILED baseline/backend/tests/test_mobile_objective_service.py::test_enrich_mobile_objectives_uses_axiom_detail
+FAILED baseline/backend/tests/test_report_examination_narratives.py::test_client_objective_and_procedure_are_controlled_kb_text
+8 failed, 40 passed in 1.78s
