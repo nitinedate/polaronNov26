@@ -73,10 +73,14 @@ def _estimate_gap_observation_pages(
     findings: list[dict[str, Any]] | None = None,
     ctx: dict[str, Any] | None = None,
 ) -> int:
-    """Printed-page count for TOC; one finding table per page."""
+    """Printed-page count for TOC.
+
+    Section 5 lists every actionable finding, packed OBS_FINDINGS_PER_PAGE
+    detail blocks per page (no longer capped at 10).
+    """
     if findings_count <= 0:
         return 1
-    return min(findings_count, 10)
+    return (findings_count + OBS_FINDINGS_PER_PAGE - 1) // OBS_FINDINGS_PER_PAGE
 
 
 def _esc(text: str | None) -> str:
@@ -1227,24 +1231,39 @@ def _severity_summary_html(summary: dict[str, Any] | None) -> str:
     )
 
 
-def _summary_table(
-    findings: list[dict[str, Any]],
-    assessment: dict[str, Any] | None = None,
-    finding_summary: dict[str, Any] | None = None,
-) -> str:
-    # Verification/coverage belongs in the interactive Scan Details UI.
-    # Do not render internal assessment-state notices in the client report.
-    severity_summary = _severity_summary_html(finding_summary)
-    if not findings:
-        return severity_summary
-    rows = []
-    for idx, f in enumerate(findings, start=1):
-        rows.append(
-            f"<tr><td class='col-srno'>{idx}</td>"
-            f"{_risk_cell(f['risk'])}"
-            f"<td class='col-name'><strong>{_esc(f['name'])}</strong></td></tr>"
-        )
-    notes = (
+# Section 4 "SUMMARY OF VULNERABILITY ASSESSMENT" is paginated at this many
+# findings per printed page. xhtml2pdf (pisa) cannot split one tall <table>
+# across pages — it renders the first page's worth of rows and silently drops
+# the rest — so we emit one self-contained <table> per page instead.
+SUMMARY_ROWS_PER_PAGE = 20
+
+
+def _summary_row_html(idx: int, f: dict[str, Any]) -> str:
+    return (
+        f"<tr><td class='col-srno'>{idx}</td>"
+        f"{_risk_cell(f['risk'])}"
+        f"<td class='col-name'><strong>{_esc(f['name'])}</strong></td></tr>"
+    )
+
+
+def _summary_rows_table(findings_chunk: list[dict[str, Any]], start_idx: int) -> str:
+    """One complete <table> for a single page's worth of summary rows.
+
+    Sr No. continues from ``start_idx`` so numbering is correct across pages.
+    """
+    rows = "".join(
+        _summary_row_html(start_idx + offset, f) for offset, f in enumerate(findings_chunk)
+    )
+    return (
+        "<table width='100%' border='1' cellspacing='0' cellpadding='0' class='gap-summary'>"
+        "<thead><tr><th class='col-srno'>Sr No.</th><th class='col-risk'>Risk</th>"
+        "<th class='col-name'>Name</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _summary_notes_html() -> str:
+    return (
         "<p class='notes-heading'>NOTES:</p>"
         "<ul class='important-notes'>"
         "<li>Kindly implement changes in the mentioned in the solution set attached with the "
@@ -1252,13 +1271,60 @@ def _summary_table(
         "<li>The changes will help you enhance your security posture.</li>"
         "</ul>"
     )
-    return (
-        severity_summary
-        + "<table width='100%' border='1' cellspacing='0' cellpadding='0' class='gap-summary'>"
-        "<thead><tr><th class='col-srno'>Sr No.</th><th class='col-risk'>Risk</th>"
-        "<th class='col-name'>Name</th></tr></thead>"
-        f"<tbody>{''.join(rows)}</tbody></table>{notes}"
-    )
+
+
+def _summary_pages(
+    findings: list[dict[str, Any]],
+    finding_summary: dict[str, Any] | None = None,
+    *,
+    per_page: int = SUMMARY_ROWS_PER_PAGE,
+) -> list[str]:
+    """Body HTML for each printed page of section 4.
+
+    The severity breakdown box is rendered once on the first page; the findings
+    table is split into chunks of ``per_page`` rows, each as its own <table> so
+    the PDF engine paginates cleanly without dropping rows. The NOTES block is
+    appended only after the final chunk.
+    """
+    severity_summary = _severity_summary_html(finding_summary)
+    if not findings:
+        return [severity_summary]
+    bodies: list[str] = []
+    total = len(findings)
+    for start in range(0, total, per_page):
+        chunk = findings[start : start + per_page]
+        is_first = start == 0
+        is_last = (start + per_page) >= total
+        parts: list[str] = []
+        if is_first:
+            parts.append(severity_summary)
+        parts.append(_summary_rows_table(chunk, start + 1))
+        if is_last:
+            parts.append(_summary_notes_html())
+        bodies.append("".join(parts))
+    return bodies
+
+
+def _summary_page_count(findings_count: int, *, per_page: int = SUMMARY_ROWS_PER_PAGE) -> int:
+    if findings_count <= 0:
+        return 1
+    return (findings_count + per_page - 1) // per_page
+
+
+def _summary_table(
+    findings: list[dict[str, Any]],
+    assessment: dict[str, Any] | None = None,
+    finding_summary: dict[str, Any] | None = None,
+) -> str:
+    """Single-block summary (severity box + full table + notes).
+
+    Retained for callers/tests that want the whole section in one string. The
+    paginated report uses :func:`_summary_pages` instead.
+    """
+    severity_summary = _severity_summary_html(finding_summary)
+    if not findings:
+        return severity_summary
+    return severity_summary + _summary_rows_table(findings, 1) + _summary_notes_html()
 
 
 def _finding_title_class(risk: str) -> str:
@@ -1537,7 +1603,13 @@ def _finding_detail_html(f: dict[str, Any], ctx: dict[str, Any]) -> str:
     desc_fn = ctx.get("_finding_description")
     mit_fn = ctx.get("_mitigation_text")
     impact_fn = ctx.get("_impact_text")
-    hosts = ", ".join(f["hosts"]) if f.get("hosts") else "Not specified"
+    host_list = f.get("hosts") or []
+    if len(host_list) > OBS_MAX_HOSTS_SHOWN:
+        hosts = ", ".join(host_list[:OBS_MAX_HOSTS_SHOWN]) + f" (+{len(host_list) - OBS_MAX_HOSTS_SHOWN} more)"
+    elif host_list:
+        hosts = ", ".join(host_list)
+    else:
+        hosts = "Not specified"
     desc = desc_fn(f) if desc_fn else (f.get("client_description") or f.get("description") or f["name"])
     impact = impact_fn(f) if impact_fn else (f.get("client_impact") or f.get("description") or f["name"])
     mit = mit_fn(f) if mit_fn else (f.get("remediation") or "Review and remediate per vendor guidance.")
@@ -1624,15 +1696,41 @@ def _contacts_html(contacts: list[dict[str, Any]]) -> str:
     return f"<div class='contacts-block'>{''.join(blocks)}</div>"
 
 
+# Section 5 "VULNERABILITY OBSERVATION" lists every actionable finding (all
+# severities except Info, which is already excluded upstream). Detail blocks are
+# packed this many per page. Each finding's detail fields are length-capped
+# upstream (~520 chars each), so two full blocks fit a page; three overflow and
+# trip xhtml2pdf's "_FrameBreak.wrap" bug, so 2 is the safe maximum.
+OBS_FINDINGS_PER_PAGE = 2
+
+# Cap the IP list shown in a finding's detail table so a finding affecting many
+# hosts cannot grow a block tall enough to overflow the page. The full per-host
+# breakdown remains in the Solution Set export.
+OBS_MAX_HOSTS_SHOWN = 25
+
+
 def _finding_details_pages(findings: list[dict[str, Any]], ctx: dict[str, Any]) -> list[tuple[str, list[str] | None, bool]]:
-    intro = "<p class='vuln-obs-intro'>&#9656; List of the top 10 identified vulnerabilities.</p>"
+    intro = (
+        "<p class='vuln-obs-intro'>&#9656; List of all identified vulnerabilities "
+        "(excluding informational observations).</p>"
+    )
     if not findings:
         return [(intro, ["5. VULNERABILITY OBSERVATION"], False)]
 
     pages: list[tuple[str, list[str] | None, bool]] = []
-    for idx, finding in enumerate(findings[:10]):
-        body = (intro if idx == 0 else "") + _finding_detail_html(finding, ctx)
-        section = ["5. VULNERABILITY OBSERVATION"] if idx == 0 else None
+    total = len(findings)
+    for page_idx, start in enumerate(range(0, total, OBS_FINDINGS_PER_PAGE)):
+        chunk = findings[start : start + OBS_FINDINGS_PER_PAGE]
+        detail_html = "".join(_finding_detail_html(f, ctx) for f in chunk)
+        body = (intro if page_idx == 0 else "") + detail_html
+        if page_idx == 0:
+            section = ["5. VULNERABILITY OBSERVATION"]
+        else:
+            section = ["5. VULNERABILITY OBSERVATION (CONTINUED)"]
+        # flow=False (page-break-inside:avoid): each page is self-contained so
+        # xhtml2pdf never has to break inside it. page-break-inside:auto pages
+        # trip the engine's "_FrameBreak.wrap" bug once a chunk needs an
+        # internal break, so chunk size is kept small enough to fit one page.
         pages.append((body, section, False))
     return pages
 
@@ -1643,9 +1741,12 @@ def _compute_toc_page_map(*, findings_count: int, findings: list[dict[str, Any]]
     site_overview = 5
     site_infra = 5
     summary = 6
-    vuln_observation = 7
+    # Section 4 now spans one page per SUMMARY_ROWS_PER_PAGE findings, so the
+    # observation section starts after all summary pages.
+    summary_pages = _summary_page_count(findings_count)
+    vuln_observation = summary + summary_pages
     detail_page_count = _estimate_gap_observation_pages(
-        min(findings_count, 10),
+        findings_count,
         findings=findings,
         ctx=ctx,
     )
@@ -1714,14 +1815,15 @@ def build_styled_gap_report_html(ctx: dict[str, Any], *, include_cover: bool = T
     )
     page_no += 1
 
-    pages.append(
-        _page_wrap(
-            _summary_table(findings, ctx.get("assessment"), ctx.get("finding_summary")),
-            page_no,
-            section_bars=["4. SUMMARY OF VULNERABILITY ASSESSMENT"],
+    summary_bodies = _summary_pages(findings, ctx.get("finding_summary"))
+    for i, summary_body in enumerate(summary_bodies):
+        title = (
+            "4. SUMMARY OF VULNERABILITY ASSESSMENT"
+            if i == 0
+            else "4. SUMMARY OF VULNERABILITY ASSESSMENT (CONTINUED)"
         )
-    )
-    page_no += 1
+        pages.append(_page_wrap(summary_body, page_no, section_bars=[title]))
+        page_no += 1
 
     for body, section, flow in _finding_details_pages(findings, ctx):
         pages.append(_page_wrap(body, page_no, section_bars=section, flow=flow))

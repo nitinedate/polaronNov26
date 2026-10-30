@@ -747,7 +747,10 @@ def render_gap_docx(ctx: dict[str, Any]) -> bytes:
                 assessment.get("message")
                 or "Assessment status is unverified; no clean conclusion can be made."
             )
-    for f in findings[:10]:
+    # Show every actionable finding (all severities except Info, already
+    # excluded from `findings`), matching the PDF report. Word paginates the
+    # headings/paragraphs natively, so no manual page splitting is needed.
+    for f in findings:
         doc.add_heading(f"➢ {f['name']}", level=2)
         doc.add_paragraph(f"Risk: {f['risk']}")
         doc.add_paragraph(f"IP address: {', '.join(f['hosts']) if f['hosts'] else '—'}")
