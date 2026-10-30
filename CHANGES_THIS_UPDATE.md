@@ -45,3 +45,9 @@ python -m pytest tests/test_remediation_core.py tests/test_live_remediate_sim.py
 python tests/test_remediation_core.py        # ALL CORE TESTS PASSED
 python tests/test_live_remediate_sim.py       # ALL ORCHESTRATION TESTS PASSED
 ```
+
+## 5. Gap report downloaded as HTML instead of PDF — fixed
+- `backend/app/services/gap_assessment_report.py` — **modified**: `render_gap_pdf` now has a
+  two-engine pipeline (xhtml2pdf primary, PyMuPDF Story fallback) with failure logging; both
+  exports raise a clear error instead of silently serving HTML on PDF-render failure. See
+  GAP_REPORT_PDF_FIX.md section 3.

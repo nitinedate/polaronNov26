@@ -40,3 +40,33 @@ vulnerabilities (excluding informational observations)." The DOCX export
 - Existing unit-test assertions (`test_summary_table_uses_full_risk_cell`,
   `test_toc_leader_dots_fill_to_page_number`) still pass.
 - Renders cleanly (ERR=0) including a stress case of one finding with 80 hosts.
+
+---
+
+## 3) Download came out as HTML instead of PDF — fixed
+**Bug:** `export_gap_report` / `export_merged_gap_report` silently fell back to serving
+**HTML** (`text/html`, `.html`) whenever `render_gap_pdf()` returned `None` — which happens
+when the PDF engine (xhtml2pdf/reportlab) is missing or errors in the running container. So a
+"download PDF" produced an `.html` file.
+
+**Fix (in `backend/app/services/gap_assessment_report.py`):**
+- `render_gap_pdf()` now tries **two engines**: xhtml2pdf (primary, high-fidelity), then
+  **PyMuPDF's Story API** (`pymupdf`, already a pinned dependency and a self-contained wheel —
+  works even if xhtml2pdf/reportlab are broken). A PDF is produced whenever *either* engine is
+  available. Cover/watermark/page-number post-processing is best-effort: if it fails, the
+  un-stamped PDF is still returned rather than lost.
+- Every failure path now **logs the specific reason** (`logging` logger
+  `app.services.gap_assessment_report`) — e.g. "xhtml2pdf is not importable", "reported N
+  errors", "PyMuPDF fallback failed" — so you can diagnose from the API logs.
+- The exports **no longer serve HTML for a PDF request.** If *both* engines fail, they raise a
+  clear error, which the endpoint turns into a 500 with a diagnosable message, instead of
+  downloading an `.html` file.
+
+**If you still see the fallback engine being used** (check the API logs for
+"rendered with the PyMuPDF fallback"), the high-fidelity engine is unavailable in the image:
+ensure `reportlab`, `xhtml2pdf` and `pymupdf` (all pinned in `backend/requirements.txt`) are
+installed and **rebuild the API container** (`docker compose build --no-cache api` then
+recreate). The fallback keeps downloads working as PDF in the meantime.
+
+**Verified:** pisa primary → PDF; pisa forced to fail → PyMuPDF fallback → valid PDF; both
+engines fail → export raises a clear error (never HTML).

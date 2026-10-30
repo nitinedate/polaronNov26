@@ -5,9 +5,12 @@ from __future__ import annotations
 import html
 import io
 import json
+import logging
 import re
 from datetime import date, datetime, timezone
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 from app.db.sql_helpers import fetchall, fetchone
 from app.services.gap_report_llm import enrich_gap_findings
@@ -614,6 +617,83 @@ def build_gap_report_html(ctx: dict[str, Any], *, include_cover: bool = True) ->
     return build_styled_gap_report_html(ctx, include_cover=include_cover)
 
 
+def _pisa_html_to_pdf(html_content: str) -> bytes | None:
+    """Primary, high-fidelity HTML -> PDF via xhtml2pdf (pisa).
+
+    Returns None (and logs the reason) on any failure, so the caller can fall back
+    to the PyMuPDF engine instead of silently serving HTML.
+    """
+    try:
+        from xhtml2pdf import pisa
+    except Exception as exc:
+        log.warning("gap-report PDF: xhtml2pdf is not importable (%s); trying PyMuPDF fallback. "
+                    "Install reportlab + xhtml2pdf in the API image for full-fidelity PDFs.", exc)
+        return None
+    try:
+        buf = io.BytesIO()
+        status = pisa.CreatePDF(html_content, dest=buf, encoding="utf-8")
+    except Exception as exc:
+        log.warning("gap-report PDF: xhtml2pdf raised while rendering (%s); trying PyMuPDF fallback", exc)
+        return None
+    if getattr(status, "err", 0):
+        log.warning("gap-report PDF: xhtml2pdf reported %s error(s); trying PyMuPDF fallback", status.err)
+        return None
+    if buf.tell() <= 100:
+        log.warning("gap-report PDF: xhtml2pdf produced empty output; trying PyMuPDF fallback")
+        return None
+    return buf.getvalue()
+
+
+def _import_fitz():
+    """PyMuPDF, importable as `pymupdf` (new) or `fitz` (legacy)."""
+    try:
+        import pymupdf as _f  # noqa
+        return _f
+    except Exception:
+        try:
+            import fitz as _f  # noqa
+            return _f
+        except Exception:
+            return None
+
+
+def _fitz_html_to_pdf(html_content: str) -> bytes | None:
+    """Fallback HTML -> PDF via PyMuPDF's Story API.
+
+    PyMuPDF is a self-contained wheel (``pymupdf`` in requirements), so this works
+    even when xhtml2pdf/reportlab are missing or broken in the container. Fidelity
+    is lower than pisa, but it guarantees a PDF instead of an HTML download.
+    """
+    fitz = _import_fitz()
+    if fitz is None:
+        log.error("gap-report PDF: PyMuPDF is not importable; cannot render fallback PDF")
+        return None
+    try:
+        buf = io.BytesIO()
+        writer = fitz.DocumentWriter(buf)
+        mediabox = fitz.Rect(0, 0, 597, 843)          # matches the report @page size
+        where = mediabox + (36, 40, -36, -40)
+        story = fitz.Story(html=html_content)
+        more, guard = 1, 0
+        while more and guard < 4000:                   # guard against a non-terminating layout
+            dev = writer.begin_page(mediabox)
+            more, _ = story.place(where)
+            story.draw(dev)
+            writer.end_page()
+            guard += 1
+        writer.close()
+        data = buf.getvalue()
+        if len(data) <= 100:
+            log.error("gap-report PDF: PyMuPDF fallback produced empty output")
+            return None
+        log.warning("gap-report PDF: rendered with the PyMuPDF fallback (lower fidelity). "
+                    "Restore xhtml2pdf in the API image for the styled report.")
+        return data
+    except Exception as exc:
+        log.error("gap-report PDF: PyMuPDF fallback failed (%s)", exc)
+        return None
+
+
 def render_gap_pdf(
     html_content: str,
     *,
@@ -621,51 +701,52 @@ def render_gap_pdf(
     company: str | None = None,
     report_date: str | None = None,
 ) -> bytes | None:
-    try:
-        from xhtml2pdf import pisa
+    """Render the gap report to PDF.
 
-        buf = io.BytesIO()
-        status = pisa.CreatePDF(html_content, dest=buf, encoding="utf-8")
-        if status.err:
-            return None
-        if buf.tell() <= 100:
-            return None
-        body_pdf = buf.getvalue()
-    except Exception:
+    Tries the high-fidelity xhtml2pdf engine first, then the dependency-light
+    PyMuPDF engine, so a PDF is produced whenever either engine is available.
+    Returns None only if BOTH engines fail (callers then raise rather than serve
+    HTML). Cover/watermark/page-number post-processing is best-effort: if it
+    fails, the un-stamped PDF is still returned rather than lost.
+    """
+    body_pdf = _pisa_html_to_pdf(html_content)
+    if body_pdf is None:
+        body_pdf = _fitz_html_to_pdf(html_content)
+    if body_pdf is None:
+        log.error("gap-report PDF: no PDF engine could render the report")
         return None
 
-    from app.services.gap_report_template import apply_confidential_watermark, stamp_gap_page_numbers
-
-    if not client:
-        stamped = apply_confidential_watermark(body_pdf, skip_first_page=False)
-        return stamp_gap_page_numbers(stamped)
-
     try:
-        import fitz
+        from app.services.gap_report_template import apply_confidential_watermark, stamp_gap_page_numbers
 
-        from app.services.gap_report_template import render_gap_cover_pdf
-
-        cover_pdf = render_gap_cover_pdf(
-            client,
-            rebrand_company(company or REPORT_COMPANY),
-            report_date or "",
-        )
-        if not cover_pdf:
+        if not client:
             stamped = apply_confidential_watermark(body_pdf, skip_first_page=False)
             return stamp_gap_page_numbers(stamped)
 
-        cover_doc = fitz.open(stream=cover_pdf, filetype="pdf")
-        body_doc = fitz.open(stream=body_pdf, filetype="pdf")
-        if body_doc.page_count > 0:
-            cover_doc.insert_pdf(body_doc)
-        merged = cover_doc.tobytes()
-        cover_doc.close()
-        body_doc.close()
-        stamped = apply_confidential_watermark(merged, skip_first_page=True)
-        return stamp_gap_page_numbers(stamped)
-    except Exception:
+        try:
+            fitz = _import_fitz()
+            from app.services.gap_report_template import render_gap_cover_pdf
+
+            cover_pdf = render_gap_cover_pdf(
+                client, rebrand_company(company or REPORT_COMPANY), report_date or "")
+            if fitz is not None and cover_pdf:
+                cover_doc = fitz.open(stream=cover_pdf, filetype="pdf")
+                body_doc = fitz.open(stream=body_pdf, filetype="pdf")
+                if body_doc.page_count > 0:
+                    cover_doc.insert_pdf(body_doc)
+                merged = cover_doc.tobytes()
+                cover_doc.close()
+                body_doc.close()
+                stamped = apply_confidential_watermark(merged, skip_first_page=True)
+                return stamp_gap_page_numbers(stamped)
+        except Exception as exc:
+            log.warning("gap-report PDF: cover merge failed (%s); returning body with watermark", exc)
+
         stamped = apply_confidential_watermark(body_pdf, skip_first_page=False)
         return stamp_gap_page_numbers(stamped)
+    except Exception as exc:
+        log.warning("gap-report PDF: post-processing failed (%s); returning un-stamped PDF", exc)
+        return body_pdf
 
 
 def render_gap_docx(ctx: dict[str, Any]) -> bytes:
@@ -802,7 +883,14 @@ def export_gap_report(
     )
     if pdf:
         return pdf, "application/pdf", f"gap-assessment-{client_slug}.pdf"
-    return build_gap_report_html(ctx, include_cover=True).encode("utf-8"), "text/html", f"gap-assessment-{client_slug}.html"
+    # A gap report requested as PDF must never be served as HTML. Both PDF engines
+    # failed, so surface a clear, diagnosable error (the endpoint turns this into a
+    # 500 with this message) instead of downloading an .html file.
+    raise RuntimeError(
+        "Gap report PDF generation failed: neither xhtml2pdf nor PyMuPDF could render the report. "
+        "Ensure reportlab, xhtml2pdf and pymupdf (all pinned in backend/requirements.txt) are installed "
+        "in the API image, then rebuild the container. See the API logs for the specific engine error."
+    )
 
 
 _SITE_COMPARE_KEYS = (
@@ -1127,8 +1215,9 @@ def export_merged_gap_report(
     )
     if pdf:
         return pdf, "application/pdf", f"gap-assessment-{client_slug}-{suffix}.pdf"
-    return (
-        build_gap_report_html(ctx, include_cover=True).encode("utf-8"),
-        "text/html",
-        f"gap-assessment-{client_slug}-{suffix}.html",
+    # Never serve a PDF request as HTML — raise a diagnosable error instead.
+    raise RuntimeError(
+        "Merged gap report PDF generation failed: neither xhtml2pdf nor PyMuPDF could render the report. "
+        "Ensure reportlab, xhtml2pdf and pymupdf (all pinned in backend/requirements.txt) are installed "
+        "in the API image, then rebuild the container. See the API logs for the specific engine error."
     )
