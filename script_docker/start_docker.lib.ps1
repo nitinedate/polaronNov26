@@ -530,6 +530,13 @@ function Save-DeploymentSettings {
     [System.IO.File]::WriteAllText($Settings.Path, $text, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Get-ComposePullFlag {
+    # Production sets this to "never" after the one library pull, so later
+    # compose up/run commands do not ask the registry for the same images again.
+    if ($script:AetherisImagePullPolicy) { return [string]$script:AetherisImagePullPolicy }
+    return "missing"
+}
+
 function Get-AppBuildArgs {
     param([string]$BuildId, [switch]$RefreshDependencies)
     if (-not $BuildId) { throw "Application build ID is required." }
@@ -689,7 +696,8 @@ function Enable-PublicFirewall {
 
 function Invoke-CertificateTool {
     param([string[]]$ComposeArgs, [string[]]$ToolArgs)
-    $raw = & docker @ComposeArgs run --rm --no-deps --pull missing --entrypoint python certbot /tools/public_https.py @ToolArgs
+    $pull = Get-ComposePullFlag
+    $raw = & docker @ComposeArgs run --rm --no-deps --pull $pull --entrypoint python certbot /tools/public_https.py @ToolArgs
     if ($LASTEXITCODE -ne 0) { throw "Certificate identity/trust check failed." }
     return (($raw -join "`n") | ConvertFrom-Json)
 }
@@ -711,12 +719,12 @@ function Ensure-PublicCertificate {
     if ($check.managed) {
         # Certbot decides whether renewal is due (including ACME Renewal Information).
         Invoke-Docker -Title "Check renewal for $Identity" -DockerArgs ($ComposeArgs + @(
-            "run", "--rm", "--no-deps", "--pull", "missing", "certbot", "renew",
+            "run", "--rm", "--no-deps", "--pull", (Get-ComposePullFlag), "certbot", "renew",
             "--cert-name", $CertName, "--non-interactive", "--no-random-sleep-on-renew"))
     } else {
         $issue = Get-CertbotIssueArgs -Identity $Identity -CertName $CertName -Email $Email -IsIP:$IsIP
         Invoke-Docker -Title "Issue trusted HTTPS certificate for $Identity" -DockerArgs (
-            $ComposeArgs + @("run", "--rm", "--no-deps", "--pull", "missing", "certbot") + $issue)
+            $ComposeArgs + @("run", "--rm", "--no-deps", "--pull", (Get-ComposePullFlag), "certbot") + $issue)
     }
     $check = Invoke-CertificateTool -ComposeArgs $ComposeArgs -ToolArgs @("inspect", "--name", $CertName, "--identity", $Identity)
     if (-not $check.valid) { throw "Certificate for $Identity is invalid: $($check.reason)." }
@@ -794,7 +802,7 @@ function Start-PublicHttpsGateway {
     Invoke-Docker -Title "Release owned HTTP certificate bootstrap" -DockerArgs (
         $ComposeArgs + @("--profile", "acme-bootstrap", "rm", "-sf", "acme-bootstrap"))
     Invoke-Docker -Title "Start HTTPS gateway on TCP 80/443 and automatic renewal" -DockerArgs (
-        $ComposeArgs + @("up", "-d", "--no-build", "--pull", "missing", "--force-recreate", "--wait", "--wait-timeout", "180", "gateway", "certbot-renewer"))
+        $ComposeArgs + @("up", "-d", "--no-build", "--pull", (Get-ComposePullFlag), "--force-recreate", "--wait", "--wait-timeout", "180", "gateway", "certbot-renewer"))
     Assert-PublicGatewayBindings -ComposeArgs $ComposeArgs
     Invoke-Docker -Title "Verify running HTTPS nginx" -DockerArgs ($ComposeArgs + @("exec", "-T", "gateway", "nginx", "-t"))
     $trusted = $true

@@ -339,6 +339,226 @@ function Invoke-StackBuild {
     Invoke-Docker -Title "Build/compile $Name" -DockerArgs $args
 }
 
+function Get-ProdDownComposeArgs {
+    param([string]$Name, [string[]]$ComposeArgs)
+    # Profiles keep Greenbone, ZAP, Trivy, and the certificate bootstrap in the
+    # same project. Down without those profiles would leave them running.
+    $extra = @()
+    if ($Name -eq 'vuln') {
+        $extra = @('--profile', 'gvm', '--profile', 'vuln-scanners', '--profile', 'legacy-ui')
+    } elseif ($Name -eq 'gateway') {
+        $extra = @('--profile', 'acme-bootstrap', '--profile', 'certbot')
+    } elseif ($Name -eq 'mobile-malware') {
+        $extra = @('--profile', 'gpu')
+    }
+    return @($ComposeArgs) + $extra
+}
+
+function Invoke-DownPolaronProjects {
+    # compose down removes containers and the project network. It does not
+    # delete volumes unless -v is passed. Evidence and database volumes stay.
+    Write-Step 'Down all Polaron Compose projects (containers removed; volumes and evidence kept)'
+    $stacks = @(Get-AllStackDefinitions)
+    foreach ($stack in $stacks) {
+        $args = @($stack.Args)
+        if ($stack.Name -eq 'gateway') { $args = @(Get-PublicGatewayArgs) }
+        $downArgs = @(Get-ProdDownComposeArgs -Name $stack.Name -ComposeArgs $args) + @('down', '--remove-orphans')
+        Invoke-Docker -Title "Down $($stack.Name)" -DockerArgs $downArgs
+    }
+    Write-Ok 'Polaron containers are down. Named volumes were not removed.'
+}
+
+function Test-DockerImagePresent {
+    param([string]$Image)
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & docker image inspect $Image --format '{{.Id}}' 2>&1 | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        $ErrorActionPreference = $saved
+    }
+}
+
+function Add-UniqueImageName {
+    param($List, [string]$Image)
+    $name = ([string]$Image).Trim()
+    if (-not $name) { return }
+    # Application tags are produced by the build step, not by docker pull.
+    if ($name -match '^(rag_new2-|aetheris-)') { return }
+    if (-not $List.Contains($name)) { [void]$List.Add($name) }
+}
+
+function Get-RemoteImagesQuiet {
+    param([string[]]$ComposeArgs)
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $raw = @(& docker @ComposeArgs config --format json 2>&1)
+        if ($LASTEXITCODE -ne 0) { return @() }
+        $text = ($raw | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) { [string]$_.Exception.Message } else { [string]$_ }
+        }) -join "`n"
+        $cfg = $text | ConvertFrom-Json
+        return @(Get-RemoteComposeImages -Config $cfg)
+    } catch {
+        return @()
+    } finally {
+        $ErrorActionPreference = $saved
+    }
+}
+
+function Get-RequiredLibraryImages {
+    # Dockerfile bases are not service images, so Compose config never lists
+    # them. Without this list every backend/frontend/scanner build pulls NVIDIA,
+    # Node, and Python again.
+    $names = New-Object System.Collections.Generic.List[string]
+    foreach ($image in @(
+        'nvidia/cuda:12.6.3-runtime-ubuntu24.04',
+        'nvidia/cuda:12.6.3-base-ubuntu24.04',
+        'node:20-alpine',
+        'nginx:1.27-alpine',
+        'python:3.12-slim',
+        'aquasec/trivy:0.58.1',
+        'clamav/clamav:1.4',
+        'certbot/certbot:v5.8.0',
+        'pgvector/pgvector:pg16',
+        'dpage/pgadmin4:8',
+        'mailhog/mailhog:v1.0.1',
+        'redis:7',
+        'cgr.dev/chainguard/minio:latest',
+        'ollama/ollama:latest',
+        'neo4j:5',
+        'opensearchproject/opensearch:2',
+        'zaproxy/zap-stable',
+        'alpine:3',
+        'registry.community.greenbone.net/community/vulnerability-tests',
+        'registry.community.greenbone.net/community/notus-data',
+        'registry.community.greenbone.net/community/scap-data',
+        'registry.community.greenbone.net/community/cert-bund-data',
+        'registry.community.greenbone.net/community/dfn-cert-data',
+        'registry.community.greenbone.net/community/data-objects',
+        'registry.community.greenbone.net/community/report-formats',
+        'registry.community.greenbone.net/community/gpg-data',
+        'registry.community.greenbone.net/community/redis-server',
+        'registry.community.greenbone.net/community/pg-gvm-migrator:stable',
+        'registry.community.greenbone.net/community/pg-gvm:stable',
+        'registry.community.greenbone.net/community/gvmd:stable',
+        'registry.community.greenbone.net/community/openvas-scanner:stable',
+        'registry.community.greenbone.net/community/ospd-openvas:stable',
+        'registry.community.greenbone.net/community/gvm-tools'
+    )) {
+        Add-UniqueImageName -List $names -Image $image
+    }
+    foreach ($stack in @(Get-AllStackDefinitions)) {
+        $args = @($stack.Args)
+        if ($stack.Name -eq 'gateway') { $args = @(Get-PublicGatewayArgs) }
+        $args = @(Get-ProdDownComposeArgs -Name $stack.Name -ComposeArgs $args)
+        foreach ($image in @(Get-RemoteImagesQuiet -ComposeArgs $args)) {
+            Add-UniqueImageName -List $names -Image $image
+        }
+    }
+    return @($names)
+}
+
+function Test-OptionalLibraryImage {
+    param([string]$Image)
+    # These feeds are large and the vulnerability stack already continues when
+    # one of them cannot start. A registry miss must not block HTTPS or the APIs.
+    return $Image -like 'registry.community.greenbone.net/*' -or $Image -eq 'zaproxy/zap-stable'
+}
+
+function Invoke-PullRequiredLibraries {
+    $images = @(Get-RequiredLibraryImages)
+    $refresh = [bool]($RefreshDependencies -or $NoCache)
+    Write-Step ("Pull {0} library images once (NVIDIA, databases, scanners, certificates)" -f $images.Count)
+    if (-not $refresh) {
+        Write-Ok 'An image already stored by Docker is skipped. It is not downloaded again.'
+    }
+    $pulled = 0
+    $skipped = 0
+    foreach ($image in $images) {
+        if ((-not $refresh) -and (Test-DockerImagePresent -Image $image)) {
+            $skipped++
+            Write-Host "    present: $image"
+            continue
+        }
+        if (Test-OptionalLibraryImage -Image $image) {
+            $code = Invoke-Docker -Title "Pull $image" -DockerArgs @('pull', $image) -PassThru
+            if ($code -ne 0) {
+                Write-Warn "Optional image $image was not pulled. Vulnerability scanning can be started again later."
+                continue
+            }
+        } else {
+            Invoke-Docker -Title "Pull $image" -DockerArgs @('pull', $image)
+        }
+        $pulled++
+    }
+    Write-Ok ("Library pull finished. downloaded={0} already-present={1}" -f $pulled, $skipped)
+}
+
+function Get-TorchIndexUrl {
+    if ($env:TORCH_INDEX_URL -and $env:TORCH_INDEX_URL.Trim()) { return $env:TORCH_INDEX_URL.Trim() }
+    $envFile = Join-Path $root '.env'
+    if (Test-Path -LiteralPath $envFile -PathType Leaf) {
+        foreach ($line in @(Get-Content -LiteralPath $envFile)) {
+            if ($line -match '^\s*TORCH_INDEX_URL\s*=\s*(.+)\s*$') {
+                return $Matches[1].Trim().Trim('"').Trim("'")
+            }
+        }
+    }
+    return 'https://download.pytorch.org/whl/cu130'
+}
+
+function Invoke-DockerImageBuild {
+    param([string]$Title, [string[]]$BuildArgs)
+    $dockerArgs = @('build')
+    if ($RefreshDependencies -or $NoCache) { $dockerArgs += @('--pull', '--no-cache') }
+    Invoke-Docker -Title $Title -DockerArgs ($dockerArgs + $BuildArgs)
+}
+
+function Invoke-OneServiceBuild {
+    param([string]$Title, [string[]]$ComposeArgs, [string]$Service, [string]$BuildId)
+    $args = @($ComposeArgs) + @(Get-AppBuildArgs -BuildId $BuildId -RefreshDependencies:($RefreshDependencies -or $NoCache)) + @($Service)
+    Invoke-Docker -Title $Title -DockerArgs $args
+}
+
+function Invoke-BuildProdApplications {
+    param([string]$BuildId)
+    $torch = Get-TorchIndexUrl
+    Write-Step 'Build shared libraries once, then each application image once'
+    Write-Ok 'Forensic, Android, iOS, and the vulnerability API share one backend image. It is not built four times.'
+
+    Invoke-DockerImageBuild -Title 'Build shared backend libraries (NVIDIA CUDA, apt, PyTorch, Python requirements)' -BuildArgs @(
+        '-f', 'backend/Dockerfile', '--target', 'dependencies',
+        '--build-arg', "TORCH_INDEX_URL=$torch",
+        '-t', 'aetheris-backend-deps', 'backend')
+    Invoke-DockerImageBuild -Title 'Build shared backend application' -BuildArgs @(
+        '-f', 'backend/Dockerfile',
+        '--build-arg', "TORCH_INDEX_URL=$torch",
+        '--build-arg', "AETHERIS_APP_BUILD_ID=$BuildId",
+        '-t', 'rag_new2-api', 'backend')
+    foreach ($tag in @('aetheris-mobile-android-app', 'aetheris-mobile-ios-app')) {
+        Invoke-Docker -Title "Tag shared backend as $tag" -DockerArgs @('tag', 'rag_new2-api', $tag)
+    }
+
+    Invoke-DockerImageBuild -Title 'Build shared website libraries (npm ci, once)' -BuildArgs @(
+        '-f', 'frontend/Dockerfile', '--target', 'dependencies',
+        '-t', 'aetheris-frontend-deps', 'frontend')
+
+    $malwareArgs = @(Get-StackComposeArgs -Root $root -Name 'mobile-malware')
+    Invoke-OneServiceBuild -Title 'Build malware application (analysis libraries on the shared pip cache)' -ComposeArgs $malwareArgs -Service 'api' -BuildId $BuildId
+    Invoke-OneServiceBuild -Title 'Build ClamAV image' -ComposeArgs $malwareArgs -Service 'clamav-update' -BuildId $BuildId
+
+    $vulnArgs = @(Get-StackComposeArgs -Root $root -Name 'vuln')
+    Invoke-OneServiceBuild -Title 'Build vulnerability scanner worker' -ComposeArgs $vulnArgs -Service 'worker-nessus' -BuildId $BuildId
+
+    Invoke-OneServiceBuild -Title 'Build HTTPS gateway website' -ComposeArgs @(Get-PublicGatewayArgs) -Service 'gateway' -BuildId $BuildId
+    Invoke-OneServiceBuild -Title 'Build Android website' -ComposeArgs @(Get-StackComposeArgs -Root $root -Name 'mobile-android') -Service 'frontend' -BuildId $BuildId
+    Invoke-OneServiceBuild -Title 'Build iOS website' -ComposeArgs @(Get-StackComposeArgs -Root $root -Name 'mobile-ios') -Service 'frontend' -BuildId $BuildId
+    Write-Ok 'Application images are built. Later Compose starts use --no-build.'
+}
+
 function Remove-ForeignComposeContainerNames {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -418,8 +638,13 @@ function Invoke-StackUp {
     Remove-ForeignComposeContainerNames -Name $Name -ComposeArgs $ComposeArgs
     Clear-StackPublishedPorts -ComposeArgs $ComposeArgs
     Ensure-ComposeExternalVolumes -ComposeArgs $ComposeArgs
-    Ensure-ComposeImagesPresent -ComposeArgs $ComposeArgs
-    $upArgs = @($ComposeArgs) + @('up', '-d', '--no-build', '--pull', 'missing')
+    # Production already pulled every remote image once. Asking Compose to pull
+    # again makes Docker Hub serve the same NVIDIA, database, and scanner images
+    # a second time.
+    if ((Get-ComposePullFlag) -ne 'never') {
+        Ensure-ComposeImagesPresent -ComposeArgs $ComposeArgs
+    }
+    $upArgs = @($ComposeArgs) + @('up', '-d', '--no-build', '--pull', (Get-ComposePullFlag))
     $code = Invoke-Docker -Title "Start $Name" -DockerArgs $upArgs -PassThru
     if ($code -eq 0) { return }
     if (Test-DockerRegistryDnsFailure $script:AetherisLastDockerText) {
@@ -462,7 +687,7 @@ function Ensure-MobileCoreWorkersStarted {
         $state = Get-ComposeServiceContainerState -ProjectName $projectName -Service $service
         if ($state -and $state.Status -eq 'created') {
             Write-Host "    Starting deferred $Name/$service after API + CUDA became healthy..." -ForegroundColor DarkCyan
-            $code = Invoke-DockerNativeSafe -DockerArgs ($ComposeArgs + @('up','-d','--no-build','--pull','missing',$service))
+            $code = Invoke-DockerNativeSafe -DockerArgs ($ComposeArgs + @('up','-d','--no-build','--pull',(Get-ComposePullFlag),$service))
             if ($code -ne 0) {
                 Write-Warn "Deferred worker start returned exit code $code for $Name/$service; readiness loop will retry/diagnose."
             }
@@ -562,7 +787,7 @@ function Invoke-VulnOneShot {
             Start-Sleep -Seconds 3
         }
 
-        $runArgs = @($ComposeArgs) + @('--profile','gvm','run','--rm','--no-deps','--pull','missing',$Service)
+        $runArgs = @($ComposeArgs) + @('--profile','gvm','run','--rm','--no-deps','--pull',(Get-ComposePullFlag),$Service)
         $exitCode = Invoke-DockerNativeSafe -DockerArgs $runArgs
         if ($exitCode -eq 0) {
             Write-Ok "Greenbone initializer '$Service' completed."
@@ -583,7 +808,7 @@ function Start-VulnerabilityStackPhased {
     Remove-ForeignComposeContainerNames -Name 'vuln' -ComposeArgs $ComposeArgs
     Clear-StackPublishedPorts -ComposeArgs $ComposeArgs -Services @('api')
     Write-Step 'Start vulnerability control plane (lightweight)'
-    Invoke-Docker -Title 'Start vulnerability API' -DockerArgs ($ComposeArgs + @('up','-d','--no-build','--pull','missing','--no-deps','api'))
+    Invoke-Docker -Title 'Start vulnerability API' -DockerArgs ($ComposeArgs + @('up','-d','--no-build','--pull',(Get-ComposePullFlag),'--no-deps','api'))
 
     # Greenbone data images are volume loaders. Running all of them with KEEP_ALIVE caused
     # large concurrent memory spikes in Docker Desktop and exit 137. Run each loader once,
@@ -611,14 +836,14 @@ function Start-VulnerabilityStackPhased {
     Write-Step 'Start Greenbone runtime in dependency order'
     $gvmArgs = @($ComposeArgs) + @('--profile','gvm')
     foreach ($service in @('redis-gvm','pg-gvm')) {
-        & docker @($gvmArgs + @('up','-d','--no-build','--pull','missing','--no-deps',$service))
+        & docker @($gvmArgs + @('up','-d','--no-build','--pull',(Get-ComposePullFlag),'--no-deps',$service))
         if ($LASTEXITCODE -ne 0) { Write-Warn "Could not start $service; scanner engine will remain degraded."; continue }
         if (-not (Wait-ComposeServiceReady -ProjectName 'aetheris-vuln' -Service $service -TimeoutSeconds 180 -AllowStartingHealth)) {
             Write-Warn "$service is not ready yet; scanner engine will continue warming in the background."
         }
     }
     foreach ($service in @('openvas','openvasd','ospd-openvas','gvmd','gvm-tools')) {
-        & docker @($gvmArgs + @('up','-d','--no-build','--pull','missing','--no-deps',$service))
+        & docker @($gvmArgs + @('up','-d','--no-build','--pull',(Get-ComposePullFlag),'--no-deps',$service))
         if ($LASTEXITCODE -ne 0) { Write-Warn "Could not start $service; scanner engine will remain degraded."; continue }
         if (-not (Wait-ComposeServiceReady -ProjectName 'aetheris-vuln' -Service $service -TimeoutSeconds 90 -AllowStartingHealth)) {
             Write-Warn "$service is not ready yet; scanner engine will continue warming in the background."
@@ -627,13 +852,13 @@ function Start-VulnerabilityStackPhased {
 
     # Start the application worker only after the scanner sockets have been given a chance to
     # appear. It can still run while Greenbone finishes feed import and will expose readiness.
-    & docker @($ComposeArgs + @('up','-d','--no-build','--pull','missing','--no-deps','worker-nessus'))
+    & docker @($ComposeArgs + @('up','-d','--no-build','--pull',(Get-ComposePullFlag),'--no-deps','worker-nessus'))
     if ($LASTEXITCODE -ne 0) { throw 'Vulnerability worker could not be started.' }
 
     Write-Step 'Start optional vulnerability sidecars'
     $sidecarArgs = @($ComposeArgs) + @('--profile','vuln-scanners')
     foreach ($service in @('trivy','zap')) {
-        & docker @($sidecarArgs + @('up','-d','--no-build','--pull','missing','--no-deps',$service))
+        & docker @($sidecarArgs + @('up','-d','--no-build','--pull',(Get-ComposePullFlag),'--no-deps',$service))
         if ($LASTEXITCODE -ne 0) {
             Write-Warn "$service did not start. Core IP/OpenVAS scanning remains available; this sidecar can be restarted later."
         }
@@ -750,7 +975,7 @@ chown -R redis:redis /data || true
     & docker run --rm --user root -v "$($state.Volume):/data" redis:7 sh -c $repairScript
     if ($LASTEXITCODE -ne 0) { Write-Warn 'Redis persistence repair command returned a warning; attempting restart before fallback reset.' }
 
-    $redisUpArgs = @($ComposeArgs) + @('up', '-d', '--no-build', '--pull', 'missing', '--force-recreate', 'redis')
+    $redisUpArgs = @($ComposeArgs) + @('up', '-d', '--no-build', '--pull', (Get-ComposePullFlag), '--force-recreate', 'redis')
     & docker @redisUpArgs
     if ($LASTEXITCODE -eq 0 -and (Wait-CommonRedisHealthy -TimeoutSeconds 35)) {
         Write-Ok 'Shared Redis recovered successfully without clearing persistence.'
@@ -778,7 +1003,7 @@ chown -R redis:redis /data || true
     & docker run --rm --user root -v "$($state.Volume):/data" redis:7 sh -c $quarantineScript
     if ($LASTEXITCODE -ne 0) { throw 'Redis persistence quarantine failed; see the Redis logs above.' }
 
-    $redisUpArgs = @($ComposeArgs) + @('up', '-d', '--no-build', '--pull', 'missing', '--force-recreate', 'redis')
+    $redisUpArgs = @($ComposeArgs) + @('up', '-d', '--no-build', '--pull', (Get-ComposePullFlag), '--force-recreate', 'redis')
     & docker @redisUpArgs
     if ($LASTEXITCODE -ne 0 -or -not (Wait-CommonRedisHealthy -TimeoutSeconds 35)) {
         $final = Get-CommonRedisState
@@ -812,7 +1037,7 @@ function Get-LocalGatewayArgs {
 function Start-AcmeBootstrap {
     param([string[]]$ComposeArgs)
     Invoke-Docker -Title 'Start temporary HTTP-01 certificate bootstrap on TCP 80' -DockerArgs (
-        $ComposeArgs + @('--profile', 'acme-bootstrap', 'up', '-d', '--no-build', '--pull', 'missing', 'acme-bootstrap'))
+        $ComposeArgs + @('--profile', 'acme-bootstrap', 'up', '-d', '--no-build', '--pull', (Get-ComposePullFlag), 'acme-bootstrap'))
 }
 
 function Wait-AcmeChallengeRoute {
@@ -944,6 +1169,11 @@ try {
     # Stop existing containers only after preflight and drive generation succeed.
     # No docker down -v, prune or global stop: preserve evidence and unrelated projects.
     Stop-PolaronStacks
+    # Production removes the stopped containers before the library pull so a
+    # later up creates them from the images built in this run.
+    if ($Profile -eq 'prod') {
+        Invoke-DownPolaronProjects
+    }
 
     # BuildKit is required for the pip and npm cache mounts. Without it, each
     # stack downloads the same libraries again.
@@ -957,9 +1187,16 @@ try {
         Write-Step "Build application images only when source changed (id $buildId)"
         Write-Ok 'Libraries already in the Docker cache are reused. A package is downloaded only when a requirements file changed.'
     }
-    $stacks = @(Get-AllStackDefinitions)
-    foreach ($stack in $stacks) {
-        Invoke-StackBuild -Name $stack.Name -ComposeArgs $stack.Args -BuildId $buildId
+    if ($Profile -eq 'prod') {
+        Invoke-PullRequiredLibraries
+        Invoke-BuildProdApplications -BuildId $buildId
+        # Images are local. Compose must not pull the same library images again.
+        $script:AetherisImagePullPolicy = 'never'
+    } else {
+        $stacks = @(Get-AllStackDefinitions)
+        foreach ($stack in $stacks) {
+            Invoke-StackBuild -Name $stack.Name -ComposeArgs $stack.Args -BuildId $buildId
+        }
     }
 
     # V55: the HTTPS gateway routes to product APIs directly over the shared Docker network.
@@ -1013,6 +1250,15 @@ try {
     }
     if ($report.OptionalFailed.Count -gt 0) {
         Write-Warn "Optional vulnerability engines are still warming/degraded: $($report.OptionalFailed -join '; ')"
+    }
+    Write-Ok ("Required containers are up ({0} running)." -f $report.Running)
+
+    if ($isPublic) {
+        $renewer = Get-ComposeServiceContainerState -ProjectName 'aetheris-gateway' -Service 'certbot-renewer'
+        if (-not $renewer -or $renewer.Status -ne 'running') {
+            throw 'Certificate renewal container certbot-renewer is not running. HTTPS would not renew the IP certificate.'
+        }
+        Write-Ok 'Certificate renewal is running. It checks every 6 hours and reloads nginx only after a successful renew.'
     }
 
     Assert-RuntimeHealth

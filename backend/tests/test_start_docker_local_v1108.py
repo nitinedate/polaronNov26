@@ -81,6 +81,35 @@ def test_drive_probes_run_in_parallel_and_do_not_drop_known_drives():
     assert "$KeepRequiredForResolution -and ($requested -contains $letter)" in gen
 
 
+def test_prod_pulls_libraries_once_then_builds_tags_and_checks_https():
+    cmd = read("script_docker/start_docker_prod.cmd")
+    assert "-Profile prod %*" in cmd
+    assert "https://122.179.141.248/" in cmd
+    assert "pull each library image once" in cmd
+    assert "certbot-renewer" in cmd
+    assert b"\r\n" in (ROOT / "script_docker" / "start_docker_prod.cmd").read_bytes()
+    ps = read("script_docker/start_docker.ps1").replace("\r\n", "\n")
+    assert "function Invoke-DownPolaronProjects" in ps
+    assert "function Invoke-PullRequiredLibraries" in ps
+    assert "function Invoke-BuildProdApplications" in ps
+    assert "nvidia/cuda:12.6.3-runtime-ubuntu24.04" in ps
+    assert "certbot/certbot:v5.8.0" in ps
+    prod = ps.split("if ($Profile -eq 'prod') {\n        Invoke-PullRequiredLibraries", 1)[1]
+    assert "Invoke-BuildProdApplications -BuildId $buildId" in prod
+    assert "$script:AetherisImagePullPolicy = 'never'" in prod
+    assert "Tag shared backend as $tag" in ps
+    assert "'aetheris-mobile-android-app', 'aetheris-mobile-ios-app'" in ps
+    assert "down', '--remove-orphans'" in ps
+    assert "'down', '-v'" not in ps and "down -v" not in ps.split("function Invoke-DownPolaronProjects", 1)[1].split("function Test-DockerImagePresent", 1)[0]
+    assert "certbot-renewer is not running" in ps
+    lib = read("script_docker/start_docker.lib.ps1")
+    assert "function Get-ComposePullFlag" in lib
+    renew = read("script_docker/renew-certificates.sh")
+    assert "certbot renew" in renew and "21600" in renew
+    gateway = read("deployment/windows-ip-https/docker-compose.gateway-public-https.yml")
+    assert "renew-certificates.sh" in gateway and "certbot/certbot:v5.8.0" in gateway
+
+
 def test_stacks_stop_together_with_progress_and_a_hard_limit():
     ps = read("script_docker/start_docker.ps1")
     body = ps.split("function Stop-PolaronStacks", 1)[1].split("function Assert-StartupAssets", 1)[0]

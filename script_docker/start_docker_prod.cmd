@@ -3,16 +3,18 @@ setlocal
 title Aetheris - start_docker_prod
 cd /d "%~dp0.."
 echo.
-echo  Trusted HTTPS for the configured static public IP on ports 80/443. No domain required.
-echo  HTTPS gateway starts after certificate validation, before product stacks.
+echo  Production HTTPS: https://122.179.141.248/ (public TCP 80 and 443). No domain required.
+echo  Order: down Polaron containers, pull each library image once, build each
+echo  application once, start every stack, then verify containers and HTTPS.
+echo  NVIDIA CUDA, PyTorch, Python, npm, databases, scanners, and Certbot are
+echo  pulled once. Forensic, Android, iOS, and the vulnerability API share that
+echo  backend image instead of downloading it again per service.
+echo  An image already stored by Docker is not downloaded again.
+echo  Let's Encrypt certificate for 122.179.141.248 is issued or renewed.
+echo  certbot-renewer checks every 6 hours and reloads nginx after a renew.
 echo  Public TCP 80 and 443 must be forwarded to this Windows host.
-echo  Stops only Polaron stacks, then rebuilds and starts all application stacks.
-echo  Existing Docker volumes, evidence, and unrelated projects are preserved.
+echo  Volumes, evidence, and unrelated projects are preserved (no down -v).
 echo  Frontend HTTP: http://localhost:3001/ (also available via host LAN IP:3001).
-echo  Production HTTPS: https://122.179.141.248/ (public TCP 80/443).
-echo  Unchanged libraries stay in the Docker cache and are not downloaded again.
-echo  The application image is rebuilt only when source or requirements changed.
-echo  First launch creates missing .env and host settings automatically.
 echo  Host settings: script_docker\start_docker.settings.json
 echo  Optional checks: -PrepareOnly or -ValidateOnly
 echo  Optional maintenance: -RefreshDependencies
@@ -31,7 +33,7 @@ echo.
 if %ERR% neq 0 (
   echo  Startup failed with exit code %ERR%.
 ) else (
-  echo  Startup finished.
+  echo  Startup finished. Open https://122.179.141.248/
 )
 if not "%AETHERIS_NO_PAUSE%"=="1" pause
 exit /b %ERR%
