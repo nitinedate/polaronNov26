@@ -14,6 +14,7 @@ from app.db.sql_helpers import fetchall, fetchone
 from app.deps import CurrentUser, firm_db, require_firm_permission
 from app.services.scan_orchestrator import DEFAULT_PIPELINE
 from app.services.gap_assessment_report import export_gap_report, export_merged_gap_report
+from app.services.gap_report_bundle import export_case_gap_bundle
 from app.services.vuln_nessus_parity import compare_nessus_csv
 from app.services.vuln_report_export import (
     export_case_csv,
@@ -362,6 +363,41 @@ def export_gap_report_docx(
     use_llm = str(llm or "").strip().lower() in {"1", "true", "yes", "on"}
     try:
         data, media_type, filename = export_gap_report(db, case_id, fmt="docx", use_llm=use_llm, scan_job_id=jid)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": str(exc)}}) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "export_failed", "message": str(exc)}},
+        ) from exc
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/api/cases/{case_id}/gap-report-bundle.zip")
+def export_gap_report_bundle(
+    case_id: str,
+    fmt: str = Query("pdf", description="pdf or docx for every gap report in the bundle."),
+    llm: str | None = None,
+    db: Session = Depends(firm_db),
+    current: CurrentUser = Depends(require_firm_permission("vuln:read")),
+):
+    """V1.27.0: "All jobs in this case" export.
+
+    One ZIP holding each scan job's gap report (``fmt``) and Solution Set, plus — when
+    the case has 2+ jobs — the merged report and combined Solution Set. A case with no
+    scan jobs yields the whole-case report + Solution Set (previous behaviour, zipped).
+    """
+    _require_vuln_module()
+    # Absent/blank llm -> None so the server's gap_report_llm_enabled setting decides,
+    # matching the single-report endpoints; an explicit truthy value forces LLM on.
+    use_llm = True if str(llm or "").strip().lower() in {"1", "true", "yes", "on"} else None
+    want = "docx" if str(fmt or "").strip().lower() == "docx" else "pdf"
+    try:
+        data, media_type, filename = export_case_gap_bundle(db, case_id, fmt=want, use_llm=use_llm)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": str(exc)}}) from exc
     except Exception as exc:

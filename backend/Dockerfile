@@ -87,7 +87,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && python -m pip install --retries 20 -r requirements.txt
 
 # This argument is intentionally below every dependency installation. The
-# Windows starter changes it once per launch so only application layers rebuild.
+# Windows starter sets it from the application source. Unchanged source keeps
+# this layer cached. A changed requirements file rebuilds only the install
+# above, and pip reuses wheels already in the BuildKit cache.
 FROM dependencies AS application
 ARG AETHERIS_APP_BUILD_ID=source
 COPY . .

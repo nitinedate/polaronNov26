@@ -2905,6 +2905,40 @@ def ensure_folder_listed(db: Session, job_id: str) -> dict | None:
     return list_folder_contents(db, job_id, path=folder)
 
 
+def registered_image_roster(db: Session, job_id: str) -> list[dict]:
+    """Every image registered on this job, with the step it is on."""
+    files = fetchall(
+        db,
+        "SELECT * FROM evidence_files WHERE job_id=:job_id ORDER BY original_name",
+        {"job_id": job_id},
+    )
+    from app.services.virtual_disk import list_image_directories
+
+    roster = []
+    for group in list_image_directories(files):
+        roster.append({
+            "label": group["label"],
+            "directory": group["directory"],
+            "segments": len(group["paths"]),
+            "step": "Registered — extraction has not started",
+        })
+    return roster
+
+
+def _log_registered_images(db: Session, job_id: str, images: list[dict]) -> None:
+    if len(images) < 2:
+        return
+    names = "; ".join(f"{item['label']} ({item['segments']} segments)" for item in images)
+    write_disk_log(
+        db,
+        job_id,
+        f"{len(images)} images are registered: {names}. "
+        "Each image is extracted on its own. Filtering and the later stages then run once on the combined files.",
+        stage="evidence_register",
+        metadata={"images": images},
+    )
+
+
 def register_segments(
     db: Session,
     job_id: str,
@@ -3399,6 +3433,8 @@ def register_segments(
         from app.services.artifact_selection_catalog import persist_job_axiom_platform
 
         platform = persist_job_axiom_platform(db, job_id)
+        images = registered_image_roster(db, job_id)
+        _log_registered_images(db, job_id, images)
         return {
             "accepted": accepted,
             "skipped": [],
@@ -3407,11 +3443,14 @@ def register_segments(
             "axiom_platform": platform,
             "capability": capability,
             "collection_summary": summary,
+            "images": images,
         }
 
     from app.services.artifact_selection_catalog import persist_job_axiom_platform
 
     platform = persist_job_axiom_platform(db, job_id)
+    images = registered_image_roster(db, job_id)
+    _log_registered_images(db, job_id, images)
     write_disk_log(
         db,
         job_id,
@@ -3419,7 +3458,14 @@ def register_segments(
         stage="evidence_register",
         metadata={"axiom_platform": platform},
     )
-    return {"accepted": accepted, "skipped": [], "readiness": sr, "message": None, "axiom_platform": platform}
+    return {
+        "accepted": accepted,
+        "skipped": [],
+        "readiness": sr,
+        "message": None,
+        "axiom_platform": platform,
+        "images": images,
+    }
 
 
 def mark_client_upload_progress(

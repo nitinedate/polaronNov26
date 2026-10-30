@@ -23,12 +23,34 @@ $action = New-ScheduledTaskAction `
     -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$ensure`"" `
     -WorkingDirectory $root
 
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+# Logon covers the first moment the examiner can plug in a phone. The repeat covers a
+# helper that later exits (reboot of Docker, a closed window, a killed powershell): the
+# ensure script returns immediately when port 9876 is already healthy.
+$logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$watch = $null
+foreach ($days in @(9999, 365, 31)) {
+    try {
+        $watch = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) `
+            -RepetitionInterval (New-TimeSpan -Minutes 5) `
+            -RepetitionDuration (New-TimeSpan -Days $days)
+        break
+    } catch {
+        $watch = $null
+    }
+}
+if (-not $watch) {
+    $watch = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) `
+        -RepetitionInterval (New-TimeSpan -Minutes 5) `
+        -RepetitionDuration (New-TimeSpan -Hours 23)
+}
+$triggers = @($logon, $watch)
 
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 20) `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1)
 
@@ -37,12 +59,12 @@ try {
     Register-ScheduledTask `
         -TaskName $taskName `
         -Action $action `
-        -Trigger $trigger `
+        -Trigger $triggers `
         -Settings $settings `
-        -Description "Starts Aetheris host drive helper (port 9876) for forensic UI folder browse and Docker drive mounts." `
+        -Description "Keeps the Polaron host helper (port 9876) running so connected phones and USB drives stay visible. Starts at logon and every 5 minutes if it has stopped." `
         -Force | Out-Null
     $taskRegistered = $true
-    Write-Host "Registered scheduled task: $taskName (runs at logon for $env:USERNAME)"
+    Write-Host "Registered scheduled task: $taskName (at logon for $env:USERNAME, and every 5 minutes if it has stopped)"
 } catch {
     Write-Warning "Could not register scheduled task ($($_.Exception.Message)). Using Startup folder fallback."
     Install-StartupFolderFallback

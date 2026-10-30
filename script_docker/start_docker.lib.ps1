@@ -538,6 +538,47 @@ function Get-AppBuildArgs {
     return $buildOptions
 }
 
+function Get-StableAppBuildId {
+    param([string]$Root)
+    # The id changes only when application source or a dependency manifest changes.
+    # An unchanged id leaves every Docker layer cached, so libraries are not fetched again.
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $files = New-Object System.Collections.Generic.List[string]
+        $named = @(
+            'backend\requirements.txt',
+            'backend\requirements-malware.txt',
+            'backend\Dockerfile',
+            'backend\Dockerfile.malware',
+            'frontend\package.json',
+            'frontend\package-lock.json',
+            'frontend\Dockerfile'
+        )
+        foreach ($rel in $named) {
+            $path = Join-Path $Root $rel
+            if (Test-Path -LiteralPath $path -PathType Leaf) { $files.Add($path) }
+        }
+        foreach ($rel in @('backend\app', 'frontend\src')) {
+            $dir = Join-Path $Root $rel
+            if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+            Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+                if ($_.FullName -match '\\__pycache__\\' -or $_.Extension -eq '.pyc') { return }
+                $files.Add($_.FullName)
+            }
+        }
+        foreach ($file in ($files | Sort-Object -Unique)) {
+            $info = Get-Item -LiteralPath $file
+            $rel = $file.Substring($Root.Length).Replace('\', '/').TrimStart('/')
+            $line = [Text.Encoding]::UTF8.GetBytes("$rel|$($info.Length)|$($info.LastWriteTimeUtc.Ticks)`n")
+            $sha.TransformBlock($line, 0, $line.Length, $null, 0) | Out-Null
+        }
+        $sha.TransformFinalBlock([byte[]]::new(0), 0, 0) | Out-Null
+        return ([BitConverter]::ToString($sha.Hash)).Replace('-', '').Substring(0, 16).ToLower()
+    } finally {
+        $sha.Dispose()
+    }
+}
+
 function Get-PublicNginxConfig {
     param([string]$PublicIP, [string]$Domain)
     $ipCert = "aetheris-ip-$PublicIP"

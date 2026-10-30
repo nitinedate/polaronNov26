@@ -384,6 +384,17 @@ export function ReportsExportPage() {
       const { has_saved_intake: _ignored, ...payload } = gapIntake;
       await vulnApi.saveGapIntake(selectedCaseId, payload);
       const scanJobId = selectedJobId || null;
+      // V1.27.0: "All jobs in this case" with 2+ jobs downloads one ZIP holding each
+      // job's report + Solution Set and the merged report + combined Solution Set.
+      // (One download, because browsers block a second programmatic one.) A case with
+      // 0 or 1 job keeps the single-file path below — there is nothing to merge.
+      if (!scanJobId && jobs.length >= 2) {
+        await vulnApi.exportGapReportBundle(selectedCaseId, fmt, jobs.length);
+        toast.success(
+          `Per-job and merged Gap Assessment Reports + Solution Sets downloaded as a ZIP (${jobs.length} scan jobs, ${fmt.toUpperCase()})`,
+        );
+        return;
+      }
       if (fmt === "pdf") await vulnApi.exportGapReportPdf(selectedCaseId, { scanJobId });
       else await vulnApi.exportGapReportDocx(selectedCaseId, { scanJobId });
       await vulnApi.exportVulnReportXlsx(selectedCaseId, scanJobId);
@@ -580,6 +591,12 @@ export function ReportsExportPage() {
                 {selectedCaseId ? (
                   <p className="mt-2 text-sm font-medium text-ink-800">
                     Report scope: {selectedJob ? `scan job ${selectedJob.id.slice(0, 8)} (${selectedJob.status})` : "all jobs in this case"}
+                  </p>
+                ) : null}
+                {selectedCaseId && !selectedJob && jobs.length >= 2 ? (
+                  <p className="mt-1 text-xs text-ink-500">
+                    Download PDF/DOCX returns one ZIP: each of the {jobs.length} scan jobs' own report and
+                    Solution Set, plus the merged report and combined Solution Set for the whole case.
                   </p>
                 ) : null}
               </div>

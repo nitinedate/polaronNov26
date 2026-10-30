@@ -945,8 +945,18 @@ try {
     # No docker down -v, prune or global stop: preserve evidence and unrelated projects.
     Stop-PolaronStacks
 
-    $buildId = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ')
-    Write-Step 'Build/compile application images (Docker dependency cache retained)'
+    # BuildKit is required for the pip and npm cache mounts. Without it, each
+    # stack downloads the same libraries again.
+    $env:DOCKER_BUILDKIT = '1'
+    $env:COMPOSE_DOCKER_CLI_BUILD = '1'
+    if ($RefreshDependencies -or $NoCache) {
+        $buildId = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ')
+        Write-Step 'Rebuild application images and refresh dependency packages'
+    } else {
+        $buildId = Get-StableAppBuildId -Root $root
+        Write-Step "Build application images only when source changed (id $buildId)"
+        Write-Ok 'Libraries already in the Docker cache are reused. A package is downloaded only when a requirements file changed.'
+    }
     $stacks = @(Get-AllStackDefinitions)
     foreach ($stack in $stacks) {
         Invoke-StackBuild -Name $stack.Name -ComposeArgs $stack.Args -BuildId $buildId

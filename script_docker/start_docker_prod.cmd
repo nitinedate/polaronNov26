@@ -10,7 +10,8 @@ echo  Stops only Polaron stacks, then rebuilds and starts all application stacks
 echo  Existing Docker volumes, evidence, and unrelated projects are preserved.
 echo  Frontend HTTP: http://localhost:3001/ (also available via host LAN IP:3001).
 echo  Production HTTPS: https://122.179.141.248/ (public TCP 80/443).
-echo  Application compiles every launch. Dependencies use Docker cache.
+echo  Unchanged libraries stay in the Docker cache and are not downloaded again.
+echo  The application image is rebuilt only when source or requirements changed.
 echo  First launch creates missing .env and host settings automatically.
 echo  Host settings: script_docker\start_docker.settings.json
 echo  Optional checks: -PrepareOnly or -ValidateOnly

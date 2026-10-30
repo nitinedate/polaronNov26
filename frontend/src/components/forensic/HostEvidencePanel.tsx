@@ -523,6 +523,32 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
   const [browsePath, setBrowsePath] = useState("");
   const [selectedSegments, setSelectedSegments] = useState<Set<string>>(new Set());
   const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<{ label: string; segments: number; step?: string }[]>([]);
+  const showRegisteredImages = useCallback(
+    (
+      images: { label: string; segments: number; step?: string }[] | undefined,
+      fallbackLabel: string,
+      fallbackSegments: number
+    ) => {
+      const rows =
+        images && images.length > 0
+          ? images.map((image) => ({
+              label: image.label,
+              segments: Number(image.segments || 0),
+              step: image.step || "Registered — extraction has not started",
+            }))
+          : [
+              {
+                label: fallbackLabel,
+                segments: fallbackSegments,
+                step: "Registered — extraction has not started",
+              },
+            ];
+      setSelectedImages(rows);
+      setSelectionLabel(rows.map((image) => `${image.label} — ${image.segments} segments`).join("; "));
+    },
+    []
+  );
   const [browseDialogOpen, setBrowseDialogOpen] = useState(false);
   const [preferredBrowseDrive, setPreferredBrowseDrive] = useState("");
   const [resolveError, setResolveError] = useState<{
@@ -576,6 +602,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
     if (!opts?.keepSelection) {
       setSelectedSegments(new Set());
       setSelectionLabel(null);
+      setSelectedImages([]);
     }
   }, []);
 
@@ -1691,7 +1718,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
           `Registered ${ingest.accepted.length} segment(s) from this directory. The next directory is extracted after this one.`
         );
         if (ingest.accepted?.length) {
-          setSelectionLabel(`${shown} — ${ingest.accepted.length} segments`);
+          showRegisteredImages(ingest.images, shown, ingest.accepted.length);
         }
         onRegistered?.();
         return;
@@ -1732,7 +1759,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
         toast.success(`${ingest.accepted.length} segment(s) registered in place`);
       }
       if (ingest.accepted?.length) {
-        setSelectionLabel(`${shown} — ${ingest.accepted.length} segments`);
+        showRegisteredImages(ingest.images, shown, ingest.accepted.length);
       }
       onRegistered?.();
     } catch (e: unknown) {
@@ -2331,7 +2358,27 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
           onRefreshMounts={() => void refreshDriveMountsOnHost()}
           onStartAgent={() => void startHostDriveAgent()}
         />
-      {selectionLabel ? (
+      {selectedImages.length > 0 ? (
+          <div className="rounded-md border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-ink-700">
+            <p className="font-semibold text-brand-800">
+              Selected images ({selectedImages.length})
+            </p>
+            <p className="mt-1 text-ink-600">
+              Each image is extracted on its own. Filtering and the later stages then run once on the combined files.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {selectedImages.map((image) => (
+                <li key={image.label} className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="font-semibold text-ink-900">{image.label}</span>
+                    <span className="text-ink-600"> — {image.segments} segments</span>
+                  </span>
+                  <span className="shrink-0 text-right font-semibold text-brand-800">{image.step}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : selectionLabel ? (
           <div className="rounded-md border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-ink-700">
             <span className="font-semibold text-brand-800">Selected:</span> {selectionLabel}
           </div>
@@ -2860,7 +2907,22 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
         </div>
       ) : null}
 
-      {selectionLabel ? (
+      {selectedImages.length > 0 ? (
+        <div className="mb-3 rounded-md border border-brand-200 bg-brand-50/50 px-3 py-2 text-xs text-ink-700">
+          <p className="font-semibold text-brand-800">Selected images ({selectedImages.length})</p>
+          <ul className="mt-2 space-y-1">
+            {selectedImages.map((image) => (
+              <li key={`${image.label}-${image.segments}`} className="flex items-start justify-between gap-3">
+                <span>
+                  <span className="font-semibold">{image.label}</span>
+                  <span> — {image.segments} segments</span>
+                </span>
+                <span className="shrink-0 font-semibold text-brand-800">{image.step}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : selectionLabel ? (
         <div className="mb-3 rounded-md border border-brand-200 bg-brand-50/50 px-3 py-2 text-xs text-ink-700">
           Selected: <span className="font-semibold">{selectionLabel}</span>
         </div>

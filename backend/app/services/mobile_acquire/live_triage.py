@@ -57,6 +57,16 @@ ANDROID_COMMANDS: tuple[tuple[str, str, int], ...] = (
     ("live/logcat_main.txt", "logcat -d -b all -v threadtime", 300),
     ("live/root_check.txt", ROOT_PROBE, 30),
 )
+# After removal, confirm the flagged packages are gone. Skip the full package dump, logcat and a second
+# copy of every APK: those are what make "Remove malware" sit on "Copying app packages (n of 100)".
+ANDROID_CONFIRM_COMMANDS: tuple[tuple[str, str, int], ...] = (
+    ("live/getprop.txt", "getprop", 60),
+    ("live/packages_all.txt", "pm list packages -f -i -U", 120),
+    ("live/packages_third_party.txt", "pm list packages -3", 60),
+    ("live/settings_secure.txt", "settings list secure", 60),
+    ("live/device_policy.txt", "dumpsys device_policy", 120),
+    ("live/accessibility.txt", "dumpsys accessibility", 120),
+)
 FORBIDDEN = ("rm ", "mv ", "pm install", "pm uninstall", "pm clear", "am force-stop", "settings put", "reboot", " > ", "dd ")
 
 
@@ -274,7 +284,7 @@ def _props(text: str) -> dict[str, str]:
 
 def collect_android(serial: str, bundle: BundleWriter, *, pull_apks: bool = True, max_apk_mb: int = 300,
                     max_total_mb: int = 1536, adb: str | None = None, instance_id: str | None = None,
-                    pull_whatsapp: bool = True,
+                    pull_whatsapp: bool = True, confirm: bool = False,
                     progress: Callable[[str, int, int], None] | None = None, log: CommandLog | None = None) -> dict:
     log = log or CommandLog()
     progress = progress or log.progress
@@ -295,10 +305,14 @@ def collect_android(serial: str, bundle: BundleWriter, *, pull_apks: bool = True
         if "unauthorized" in (st + err):
             raise TriageError("USB debugging is not authorised: unlock the phone and tap Allow on the RSA prompt")
         raise TriageError(f"phone not ready over adb ({st or err or 'no state'})")
-    steps = len(ANDROID_COMMANDS) + 1
+    if confirm:
+        pull_apks = False
+        pull_whatsapp = False
+    commands = ANDROID_CONFIRM_COMMANDS if confirm else ANDROID_COMMANDS
+    steps = len(commands) + (0 if confirm else 1)
     props: dict[str, str] = {}
     outputs: dict[str, str] = {}
-    for i, (path, command, timeout) in enumerate(ANDROID_COMMANDS, 1):
+    for i, (path, command, timeout) in enumerate(commands, 1):
         progress(f"Reading {path.rsplit('/', 1)[-1]}", i, steps)
         started = time.monotonic()
         entry = log.start(f"adb shell {command if command != ROOT_PROBE else 'test -e <su, Magisk and KernelSU paths>'}")
@@ -636,6 +650,11 @@ def _pull_apks(tool: Adb, bundle: BundleWriter, *, max_apk_mb: int, max_total_mb
                 used += local.stat().st_size
                 local.unlink()
             copied.append(item["package"])
+    if skipped and copied:
+        progress(f"Copied {len(copied)} of {len(plan)} app packages. The rest stay on the phone so the capture stays within the size budget.",
+                 len(plan), len(plan))
+    elif plan:
+        progress(f"Copied {len(copied)} app packages.", len(plan), len(plan))
     if skipped:
         bundle.warnings.append(
             f"{len(skipped)} app package(s) not copied ({sum(s['mb'] for s in skipped):.0f} MB) to stay within the "
@@ -731,7 +750,8 @@ def collect_ios(udid: str, bundle: BundleWriter, *, crash_reports: bool = True,
 # -------------------------------------------------------------------------------------------- driver --
 def run_triage(*, platform: str, device_id: str, out: Path, examiner: str, legal_authority: str, pull_apks: bool = True,
                crash_reports: bool = True, max_apk_mb: int = 300, max_total_mb: int = 1536, adb: str | None = None,
-               progress_file: str | None = None, instance_id: str | None = None, pull_whatsapp: bool = True) -> dict:
+               progress_file: str | None = None, instance_id: str | None = None, pull_whatsapp: bool = True,
+               confirm: bool = False) -> dict:
     if not legal_authority.strip():
         raise TriageError("legal authority is required before reading a phone")
 
@@ -741,10 +761,13 @@ def run_triage(*, platform: str, device_id: str, out: Path, examiner: str, legal
     device: dict = {"platform": platform, "device_id": device_id}
     partial_reason = None
     try:
+        if confirm:
+            pull_apks = False
+            pull_whatsapp = False
         if platform == "android":
             device = collect_android(device_id, bundle, pull_apks=pull_apks, max_apk_mb=max_apk_mb,
                                      max_total_mb=max_total_mb, adb=adb, instance_id=instance_id,
-                                     pull_whatsapp=pull_whatsapp, log=log)
+                                     pull_whatsapp=pull_whatsapp, confirm=confirm, log=log)
         elif platform == "ios":
             device = collect_ios(device_id, bundle, crash_reports=crash_reports, log=log)
         else:
@@ -763,7 +786,8 @@ def run_triage(*, platform: str, device_id: str, out: Path, examiner: str, legal
         "kind": "aetheris-live-triage", "collector_version": COLLECTOR_VERSION, "platform": platform, "device": device,
         "examiner": examiner, "legal_authority": legal_authority, "started_at": started, "finished_at": _now(),
         "host": _platform.node(), "read_only": True, "commands": log.entries, "partial": partial_reason,
-        "options": {"pull_apks": pull_apks, "crash_reports": crash_reports, "max_apk_mb": max_apk_mb, "max_total_mb": max_total_mb},
+        "options": {"pull_apks": pull_apks, "pull_whatsapp": pull_whatsapp, "confirm": confirm,
+                    "crash_reports": crash_reports, "max_apk_mb": max_apk_mb, "max_total_mb": max_total_mb},
     })
     digest = hashlib.sha256(Path(out).read_bytes()).hexdigest()
     return {"ok": True, "bundle": str(out), "bundle_sha256": digest, "bundle_bytes": Path(out).stat().st_size,
@@ -796,7 +820,10 @@ def main(argv: list[str] | None = None) -> int:
             pull_apks=bool(req.get("pull_apks", not a.no_apks)), crash_reports=bool(req.get("crash_reports", not a.no_crash_reports)),
             max_apk_mb=int(req.get("max_apk_mb") or a.max_apk_mb), max_total_mb=int(req.get("max_total_mb") or a.max_total_mb),
             progress_file=req.get("progress_file") or a.progress_file, instance_id=req.get("instance_id"),
-            pull_whatsapp=req.get("pull_whatsapp", True))
+            pull_whatsapp=req.get("pull_whatsapp", True),
+            # The helper already forwards pull_apks and pull_whatsapp. A confirming read sets both false
+            # so an already-running helper (which does not know the newer confirm flag) still skips the copy.
+            confirm=bool(req.get("confirm")) or (req.get("pull_apks") is False and req.get("pull_whatsapp") is False))
     except Exception as exc:
         result = {"ok": False, "error": str(exc)[:1000]}
     if result_file:

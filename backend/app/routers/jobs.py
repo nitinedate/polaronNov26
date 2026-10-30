@@ -2262,6 +2262,7 @@ def ingest_host_path(
         "accepted": result["accepted"],
         "skipped": result.get("skipped", []),
         "readiness": result.get("readiness"),
+        "images": result.get("images") or [],
     }
 
 

@@ -96,7 +96,7 @@ export function JobProgressBanner({
                     {" · "}
                     {directory.label}
                     {" · "}
-                    {directory.state === "saved" ? "Saved" : directory.state === "extracting" ? "Extracting" : "Waiting"}
+                    {directory.step || (directory.state === "saved" ? "Saved" : directory.state === "extracting" ? "Extracting" : "Waiting")}
                   </li>
                 );
               })}

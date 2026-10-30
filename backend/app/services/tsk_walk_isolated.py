@@ -105,6 +105,10 @@ def enumerate_tsk_isolated(vd, *, on_progress=None, schema_name: str | None = No
     preferred = "inode"
     alternate = "path"
     root_cap = max(root_idle, float(os.environ.get("EXTRACT_TSK_ROOT_MAX_SEC", "900")))
+    # A large E01 can spend longer than root_cap inside libewf while the read
+    # offset is still moving. That is progress. Only a silent open is capped
+    # at root_cap; an open that keeps reading may continue until absolute_cap.
+    absolute_cap = max(root_cap, float(os.environ.get("EXTRACT_TSK_ROOT_ABSOLUTE_SEC", "14400")))
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         # Parallel -> serial (same inode method) -> serial path fallback.
@@ -165,8 +169,20 @@ def enumerate_tsk_isolated(vd, *, on_progress=None, schema_name: str | None = No
                         timeout = root_idle if max_counts == (0, 0, 0) else idle
                         # A moving E01 offset means the root open is still reading
                         # metadata. Silence, not an active seek, is the stall.
-                        # The hard cap still switches method if the open never returns.
-                        if max_counts == (0, 0, 0) and now - attempt_clock >= root_cap:
+                        offset_advancing = (
+                            last_read_offset is not None and (now - last_useful) < timeout
+                        )
+                        if max_counts == (0, 0, 0) and now - attempt_clock >= absolute_cap:
+                            raise TSKWalkTimeout(
+                                f"TSK root open exceeded {int(absolute_cap)}s; "
+                                f"phase={reader_phase}, last_call={last_native_call}, "
+                                f"root={root_method}, attempt={attempt}/{attempts}; "
+                                "read-only child will be stopped; no partial inventory committed")
+                        if (
+                            max_counts == (0, 0, 0)
+                            and now - attempt_clock >= root_cap
+                            and not offset_advancing
+                        ):
                             raise TSKWalkTimeout(
                                 f"TSK root open exceeded {int(root_cap)}s; "
                                 f"phase={reader_phase}, last_call={last_native_call}, "

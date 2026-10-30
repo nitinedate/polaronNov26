@@ -184,6 +184,25 @@ def directory_roster(db, job_id: str, row: dict | None = None) -> list[dict]:
             "files": known_files,
             "bytes": known_bytes,
         }
+        if state == "extracting":
+            step = "Extracting this image"
+        elif state == "waiting":
+            step = "Waiting — this image is extracted after the one that is open"
+        elif extracting:
+            step = "Extracted — filtering and later stages start after every image is saved"
+        else:
+            current_step = ""
+            if isinstance(progress, dict):
+                current_step = str(progress.get("label") or "")
+                serial = progress.get("serial_pipeline")
+                if isinstance(serial, dict):
+                    current_id = str(serial.get("current_stage") or "")
+                    for stage in serial.get("stages") or []:
+                        if isinstance(stage, dict) and str(stage.get("id") or "") == current_id:
+                            current_step = str(stage.get("label") or current_step)
+                            break
+            step = current_step or "Saved — filtering and later stages use the combined files"
+        entry["step"] = step
         if state == "saved" and known_files is None:
             saved_missing.append(entry)
         roster.append(entry)
@@ -368,8 +387,8 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
                 write_disk_log(
                     db,
                     job_id,
-                    f"Combined {len(registered)} directories. The same extract filter was applied "
-                    "to each directory. Starting the next pipeline stage.",
+                    f"Combined {len(registered)} images. Extraction of every image is saved. "
+                    "Filtering and the later stages now run once on the combined file list.",
                     stage="extract",
                     metadata={"directories": [item["label"] for item in registered]},
                 )
@@ -393,7 +412,11 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
         except Exception:
             log.exception("appended directory files were not registered job=%s", job_id)
         return {"status": "extracted", "directories": extracted}
-    except Exception:
+    except Exception as exc:
+        from app.services.job_control import JobStopRequested
+
+        if isinstance(exc, JobStopRequested):
+            raise
         log.exception("next evidence directory failed job=%s", job_id)
         raise
     finally:
@@ -481,6 +504,7 @@ def _extract_one_directory(
     )
     from app.services.extract_shard_v45 import shard_worker_v45
     from app.services.os_detect import detect_os_from_paths
+    from app.services.disk_manifest import disk_prefix
     from app.services.pipeline_progress import write_merged_pipeline_progress
     from app.services.virtual_disk import open_virtual_disk_from_paths
     import zstandard as zstd

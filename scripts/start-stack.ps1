@@ -388,7 +388,8 @@ try {
     if ($targets -contains "mobile-android") { Write-Host "Android compact UI:         http://localhost:3002" }
     if ($targets -contains "mobile-ios") { Write-Host "iOS compact UI:             http://localhost:3004" }
 
-    if ($targets -contains "forensic" -or $targets -contains "mobile-android" -or $targets -contains "mobile-ios" -or $targets -contains "mobile-extract") {
+    $usbProducts = @("forensic", "mobile-android", "mobile-ios", "mobile-extract", "mobile-malware")
+    if ($usbProducts | Where-Object { $targets -contains $_ }) {
         Write-Host "Ensuring Windows HostDrive/mobile USB helper is online..." -ForegroundColor Cyan
         $ensureHelper = Join-Path $root "scripts\ensure-host-drive-helper.ps1"
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ensureHelper
@@ -422,13 +423,11 @@ try {
             }
         }
 
-        # Keep the helper available after the next Windows logon as well.
+        # Logon plus a 5-minute watchdog. Re-register every start so an older logon-only
+        # task picks up the watchdog (a dead helper is why a plugged-in phone disappears).
         try {
-            $task = Get-ScheduledTask -TaskName "AetherisHostDriveHelper" -ErrorAction SilentlyContinue
-            if (-not $task) {
-                Write-Host "Installing host drive helper autostart (logon task)..."
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "scripts\install-host-drive-helper-task.ps1")
-            }
+            Write-Host "Registering host drive helper autostart (logon and every 5 minutes)..."
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "scripts\install-host-drive-helper-task.ps1")
         } catch { }
     }
 }

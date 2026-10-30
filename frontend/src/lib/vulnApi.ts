@@ -359,6 +359,19 @@ export const vulnApi = {
       180_000,
     ),
 
+  /**
+   * V1.27.0: "All jobs in this case" export. One ZIP with each scan job's gap report
+   * (``fmt``) and Solution Set, plus — when the case has 2+ jobs — the merged report
+   * and combined Solution Set. The filename comes from the server's Content-Disposition.
+   */
+  exportGapReportBundle: (caseId: string, fmt: "pdf" | "docx", jobCount: number, query?: { llm?: boolean }) =>
+    api.download(
+      `/api/cases/${caseId}/gap-report-bundle.zip`,
+      `gap-assessment-case-${caseId.slice(0, 8)}-${Math.max(jobCount, 1)}-jobs.zip`,
+      { fmt, ...(query?.llm ? { llm: "1" } : {}) },
+      300_000,
+    ),
+
   /** Merge 2+ case gap reports: identical findings append IPs; different findings stay separate. */
   /** V1.10.6: finished scan jobs (any case with a saved site overview), newest first. */
   listGapMergeJobCandidates: (query?: { from_date?: string; to_date?: string; limit?: number }) =>

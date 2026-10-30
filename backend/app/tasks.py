@@ -185,8 +185,38 @@ def build_extracted_disk_sync(schema_name: str, job_id: str) -> dict:
         return build_extracted_disk(db, job_id, schema_name=schema_name)
 
 
+def _pause_for_examiner_stop(schema_name: str, job_id: str) -> dict:
+    """An examiner stop is a pause, not a failed pipeline."""
+    from app.db.sql_helpers import fetchone
+    from app.services.disk_build_log import write_disk_log
+    from app.services.job_control import mark_job_paused
+
+    try:
+        with firm_session(schema_name) as db:
+            row = fetchone(db, "SELECT status FROM jobs WHERE id=:id", {"id": job_id}) or {}
+            status = str(row.get("status") or "")
+            write_disk_log(db, job_id, "Evidence extraction stopped by examiner", stage="extract")
+            if status not in {"paused", "completed", "failed", "ready", "report_ready"}:
+                mark_job_paused(db, job_id, message="Evidence extraction stopped by examiner")
+            db.commit()
+    except Exception:
+        log.warning("could not record examiner stop job=%s", job_id, exc_info=True)
+    return {"ok": False, "stopped": True, "status": "paused"}
+
+
 def phase3_pipeline_sync(schema_name: str, job_id: str) -> dict:
+    from app.services.job_control import JobStopRequested
     from app.services.next_evidence_directory import extract_pending_directories
+
+    try:
+        return _phase3_pipeline_body(schema_name, job_id, extract_pending_directories)
+    except JobStopRequested:
+        log.info("Phase 3 stopped by examiner job=%s", job_id)
+        return _pause_for_examiner_stop(schema_name, job_id)
+
+
+def _phase3_pipeline_body(schema_name: str, job_id: str, extract_pending_directories) -> dict:
+    from app.services.job_control import JobStopRequested
 
     with firm_session(schema_name) as db:
         pending = extract_pending_directories(db, job_id, schema_name=schema_name)
@@ -201,6 +231,8 @@ def phase3_pipeline_sync(schema_name: str, job_id: str) -> dict:
     try:
         with firm_session(schema_name) as db:
             return run_phase3_pipeline(db, job_id, schema_name=schema_name)
+    except JobStopRequested:
+        raise
     except Exception as exc:
         from app.services.db_resilience import TransientDatabaseError, is_transient_db_error
 

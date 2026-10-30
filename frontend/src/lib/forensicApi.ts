@@ -644,6 +644,7 @@ export const forensicApi = {
       processing_queued: boolean;
       accepted: UploadResult["accepted"];
       skipped: string[];
+      images?: { label: string; directory?: string; segments: number; step?: string }[];
     }>(
       `/api/jobs/${jobId}/evidence/ingest-path`,
       payload,

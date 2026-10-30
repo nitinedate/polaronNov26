@@ -69,9 +69,17 @@ def _accessibility_components(tool: WriteAdb) -> list[str]:
 
 
 def remove_package(tool: WriteAdb, package: str, *, has_root: bool, admins: set[str],
-                   accessibility: list[str]) -> dict:
-    """Remove one package, recording each step. Returns {package, removed, steps:[...]}."""
+                   accessibility: list[str], on_action=None) -> dict:
+    """Remove one package, recording each step. Returns {package, removed, steps:[...]}.
+
+    ``on_action`` is called with the step name before that command runs, so a progress file can name
+    the app that is being removed right now.
+    """
     steps: list[dict] = []
+
+    def begin(action: str) -> None:
+        if on_action:
+            on_action(action)
 
     def step(action: str, res: subprocess.CompletedProcess | None, ok: bool | None = None, note: str | None = None):
         code = None if res is None else res.returncode
@@ -81,6 +89,7 @@ def remove_package(tool: WriteAdb, package: str, *, has_root: bool, admins: set[
 
     # 1. Revoke device-admin (a device-admin app refuses uninstall until it is removed as admin).
     if package in admins:
+        begin("revoke device-admin")
         res = tool.shell(f"dpm remove-active-admin {package}/.DeviceAdminReceiver", 20)
         if res.returncode != 0 and has_root:
             res = tool.shell(f"su -c 'dpm remove-active-admin {package}/.DeviceAdminReceiver'", 20)
@@ -90,25 +99,31 @@ def remove_package(tool: WriteAdb, package: str, *, has_root: bool, admins: set[
     acc = [c for c in accessibility if c.startswith(package + "/")]
     if acc:
         remaining = ":".join(c for c in accessibility if not c.startswith(package + "/"))
+        begin("disable accessibility")
         res = tool.shell(f"settings put secure enabled_accessibility_services '{remaining}'", 15)
         step("disable accessibility", res)
 
     # 3. Force-stop, then uninstall.
+    begin("force-stop")
     step("force-stop", tool.shell(f"am force-stop {package}", 20))
+    begin("uninstall")
     res = tool.run(["uninstall", package], 60)
     removed = res.returncode == 0 and "Success" in _text(res)
     step("uninstall", res, ok=removed)
 
     # 4. Fallbacks when a normal uninstall is refused (system app, or protected).
     if not removed:
+        begin("uninstall --user 0")
         res = tool.shell(f"pm uninstall --user 0 {package}", 60)
         removed = "Success" in _text(res)
         step("uninstall --user 0", res, ok=removed)
     if not removed and has_root:
+        begin("uninstall (root)")
         res = tool.shell(f"su -c 'pm uninstall --user 0 {package}'", 60)
         removed = "Success" in _text(res)
         step("uninstall (root)", res, ok=removed)
         if not removed:  # last resort for embedded apps: disable so it cannot run
+            begin("disable (root)")
             res = tool.shell(f"su -c 'pm disable-user --user 0 {package}'", 30)
             disabled = "new state: disabled" in _text(res).lower()
             step("disable (root)", res, ok=disabled)
@@ -146,16 +161,20 @@ def run_remediation(*, device_id: str, packages: list[str], examiner: str, conse
     accessibility = _accessibility_components(tool)
     results = []
 
-    def emit(done: int):
-        if progress_file:
-            body = {"status": "running", "done": done, "total": len(packages), "updated_at": _now(), "results": results}
-            tmp = f"{progress_file}.tmp"
-            Path(tmp).write_text(json.dumps(body))
-            os.replace(tmp, progress_file)
+    def emit(done: int, current: str | None = None, action: str | None = None):
+        if not progress_file:
+            return
+        body = {"status": "running", "done": done, "total": len(packages), "current": current, "action": action,
+                "updated_at": _now(), "results": results}
+        from app.services.mobile_acquire.live_triage import _write_progress_file
+
+        _write_progress_file(progress_file, json.dumps(body))
 
     emit(0)
     for i, pkg in enumerate(packages, 1):
-        results.append(remove_package(tool, pkg, has_root=has_root, admins=admins, accessibility=accessibility))
+        results.append(remove_package(
+            tool, pkg, has_root=has_root, admins=admins, accessibility=accessibility,
+            on_action=lambda action, package=pkg, finished=i - 1: emit(finished, package, action)))
         emit(i)
 
     still = _still_installed(tool, packages)

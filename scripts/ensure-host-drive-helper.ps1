@@ -22,6 +22,33 @@ function Get-HelperScriptVersion {
 $agent = Join-Path $root "scripts\hostdrive-agent.ps1"
 $ExpectedHelperVersion = "5.57"
 
+# The logon/5-minute watchdog calls this script constantly. When the helper is already
+# the right process, return before the examiner-kit check (that check installs drivers
+# and must not run every five minutes).
+if (-not $ForceRestart) {
+    $alreadyCurrent = $false
+    try {
+        $quick = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+        $rootFull = [System.IO.Path]::GetFullPath($root).TrimEnd('\')
+        $helperRoot = [string]$quick.root
+        if ($helperRoot) { $helperRoot = [System.IO.Path]::GetFullPath($helperRoot).TrimEnd('\') }
+        $jobOk = $true
+        $jobFile = Join-Path $root "scripts\refresh-drive-mounts-job.ps1"
+        if ((Test-Path -LiteralPath $jobFile) -and $quick.job_script_version) {
+            $jobLine = Select-String -LiteralPath $jobFile -Pattern 'AETHERIS_JOB_VERSION:\s*([0-9][0-9A-Za-z.\-]*)' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($jobLine -and $jobLine.Matches[0].Groups[1].Value -ne [string]$quick.job_script_version) { $jobOk = $false }
+        }
+        $bindOk = ($BindHost -ne "+") -or ([string]$quick.bind_host -eq "+")
+        $alreadyCurrent = [bool]$quick.ok -and $helperRoot -and $helperRoot.Equals($rootFull, [StringComparison]::OrdinalIgnoreCase) -and ([string]$quick.helper_version -eq $ExpectedHelperVersion) -and $bindOk -and $jobOk
+    } catch {
+        $alreadyCurrent = $false
+    }
+    if ($alreadyCurrent) {
+        Write-Host "Host drive helper already running on http://127.0.0.1:$Port/health"
+        exit 0
+    }
+}
+
 function Test-IsAdministrator {
     try {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

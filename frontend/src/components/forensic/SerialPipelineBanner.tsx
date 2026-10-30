@@ -114,8 +114,8 @@ export function SerialPipelineBanner({ pipeline, paused, compact, elapsed }: {
                 <span className="mt-0.5 block text-ink-800">{directory.index}. {directory.label}</span>
                 <span className="mt-0.5 block text-ink-600">{directory.detail} · {Number(directory.segments || 0).toLocaleString()} segment file(s)</span>
               </span>
-              <span className={`shrink-0 font-semibold ${directory.state === "saved" ? "text-emerald-700" : directory.state === "extracting" ? "text-amber-700" : "text-ink-500"}`}>
-                {directory.state === "saved" ? "Saved" : directory.state === "extracting" ? "Extracting" : "Waiting"}
+              <span className={`shrink-0 max-w-[14rem] text-right font-semibold ${directory.state === "saved" ? "text-emerald-700" : directory.state === "extracting" ? "text-amber-700" : "text-ink-500"}`}>
+                {directory.step || (directory.state === "saved" ? "Saved" : directory.state === "extracting" ? "Extracting" : "Waiting")}
               </span>
             </li>
           ))}
