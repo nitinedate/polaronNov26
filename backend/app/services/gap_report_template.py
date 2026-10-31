@@ -1761,6 +1761,153 @@ def _compute_toc_page_map(*, findings_count: int, findings: list[dict[str, Any]]
     }
 
 
+_FALLBACK_CSS = """<style>
+* { box-sizing: border-box; }
+body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color: #000; }
+h1.cover { text-align: center; font-size: 26pt; color: #1f3860; margin: 40px 0 6px; letter-spacing: 1px; }
+p.cover-sub { text-align: center; color: #446ec4; font-size: 14pt; font-weight: bold; margin: 2px 0; }
+p.cover-meta { text-align: center; font-size: 12pt; font-weight: bold; margin: 2px 0; }
+h2.section { background-color: #446ec4; color: #fff; padding: 8px 10px; font-size: 14pt; margin: 16px 0 10px; }
+p.body { margin: 6px 0; }
+p.obs-name { color: #c00000; font-weight: bold; margin: 14px 0 4px; }
+table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; }
+th, td { border: 1px solid #000; padding: 5px 7px; vertical-align: top; text-align: left; }
+/* PyMuPDF's Story engine repaints a cell's solid background onto tall rows
+   elsewhere in the document, so coloured severity is shown with left-border bars
+   + coloured bold text instead of filled cells. Only light header shading remains
+   (its faint bleed lands in empty page space, never over body text). */
+table.sev td { text-align: center; font-weight: bold; font-size: 10pt; }
+table.summary th { background-color: #eeeeee; text-align: center; font-weight: bold; }
+td.srno { text-align: center; }
+table.kv th { background-color: #f2f2f2; font-weight: bold; }
+</style>"""
+
+_RISK_TEXT_DARK = {"Medium", "Low"}
+
+# Readable text colours for the fallback detail tables. PyMuPDF's Story engine
+# mis-paints a cell's solid background onto tall rows elsewhere in the same table,
+# so the detail "Risk" value is drawn as coloured bold TEXT (no cell fill). These
+# are darkened so Medium/Low stay legible on white.
+_FB_RISK_TEXT = {
+    "Critical": "#c00000",
+    "High": "#d00000",
+    "Medium": "#b06a00",
+    "Low": "#3f7a2e",
+    "Info": "#2e6da4",
+}
+
+
+def _fb_risk_style(risk: str) -> tuple[str, str]:
+    """(background colour, css class suffix) for a risk level in the fallback report."""
+    bg = _RISK_BG.get(risk, "#808080")
+    suffix = risk.lower() if risk in _RISK_TEXT_DARK else ""
+    return bg, suffix
+
+
+def build_fallback_report_html(ctx: dict[str, Any]) -> str:
+    """Clean, self-contained HTML tuned for the PyMuPDF (Story) fallback engine.
+
+    The styled report HTML is written for xhtml2pdf; PyMuPDF's Story engine mis-renders
+    its page-break/positioned CSS (stray bars, overlapping cells). This builder emits only
+    Story-safe markup — plain flowing tables with <colgroup> widths and solid background
+    colours — so the fallback PDF is clean and aligned even when xhtml2pdf is unavailable.
+    """
+    site = ctx.get("site") or {}
+    client = _esc(ctx.get("client") or "")
+    report_date = _esc(ctx.get("report_date") or "")
+    company = _esc(_site_value(site.get("company_name"), REPORT_COMPANY))
+    findings = ctx.get("findings") or []
+    fs = ctx.get("finding_summary") or {}
+
+    desc_fn = ctx.get("_finding_description") or (lambda f: f.get("description") or f.get("name") or "")
+    impact_fn = ctx.get("_impact_text") or (lambda f: "")
+    mit_fn = ctx.get("_mitigation_text") or (lambda f: f.get("remediation") or "")
+
+    out: list[str] = ["<html><head><meta charset='utf-8'/>", _FALLBACK_CSS, "</head><body>"]
+
+    # Cover
+    out.append("<h1 class='cover'>GAP ANALYSIS REPORT</h1>")
+    out.append(f"<p class='cover-sub'>{client}</p>")
+    out.append(f"<p class='cover-meta'>{report_date}</p>")
+    out.append(f"<p class='cover-meta'>{company}</p>")
+
+    # 1. Introduction
+    intro = _esc(ctx.get("intro") or "")
+    if intro:
+        out.append("<h2 class='section'>1. INTRODUCTION</h2>")
+        out.append(f"<p class='body'>{intro}</p>")
+
+    # 2 & 3. Site overview + infrastructure
+    fw = site.get("firewall") or {}
+    out.append("<h2 class='section'>2. SITE OVERVIEW</h2>")
+    for label, val in (("CLIENT:", client),
+                       ("BRANCH LOCATION's:", _esc(_site_value(site.get("branch_locations")))),
+                       ("CONTACT PERSON:", _esc(_site_value(site.get("contact_person"))))):
+        out.append(f"<p class='body'><strong>{label}</strong> {val}</p>")
+    out.append("<h2 class='section'>3. SITE INFRASTRUCTURE</h2>")
+    out.append(f"<p class='body'><strong>ENDPOINTS:</strong> No. of Endpoints – {_esc(_site_value(site.get('num_endpoints')))}</p>")
+    out.append(f"<p class='body'><strong>FIREWALL:</strong> {_esc(_site_value(fw.get('make_model') or site.get('firewall_summary'), 'No Firewall'))}</p>")
+
+    # 4. Summary of vulnerability assessment
+    out.append("<h2 class='section'>4. SUMMARY OF VULNERABILITY ASSESSMENT</h2>")
+    sev = []
+    for key, label, border in (("Critical", "Critical", COLOR_CRITICAL), ("High", "High", COLOR_HIGH),
+                               ("Medium", "Medium", COLOR_MEDIUM), ("Low", "Low", COLOR_LOW),
+                               ("Info", "Info", COLOR_INFO), ("total", "Total", "#404040")):
+        txt = _FB_RISK_TEXT.get(key, "#000000")
+        sev.append(f"<td style='border-left:7px solid {border};color:{txt}'>{label}<br/>{_esc(fs.get(key, 0))}</td>")
+    out.append(f"<table class='sev'><tbody><tr>{''.join(sev)}</tr></tbody></table>")
+    if fs.get("actionable") is not None:
+        out.append(f"<p class='body'><strong>Actionable findings:</strong> {_esc(fs.get('actionable'))} &nbsp; | &nbsp; "
+                   f"<strong>Informational observations:</strong> {_esc(fs.get('informational', fs.get('Info', 0)))}</p>")
+    # findings table (all actionable findings)
+    rows = []
+    for idx, f in enumerate(findings, start=1):
+        risk = f.get("risk", "")
+        border = _RISK_BG.get(risk, "#808080")
+        txt = _FB_RISK_TEXT.get(risk, "#000000")
+        rows.append(f"<tr><td class='srno'>{idx}</td>"
+                    f"<td style='border-left:6px solid {border};color:{txt};font-weight:bold;text-align:center'>"
+                    f"{_esc(str(risk).upper())}</td>"
+                    f"<td><strong>{_esc(f.get('name',''))}</strong></td></tr>")
+    out.append("<table class='summary'><colgroup><col style='width:70px'/><col style='width:120px'/><col/></colgroup>"
+               "<thead><tr><th>Sr No.</th><th>Risk</th><th>Name</th></tr></thead>"
+               f"<tbody>{''.join(rows)}</tbody></table>")
+    out.append("<p class='body'><strong>NOTES:</strong> Kindly implement the changes mentioned in the solution set "
+               "attached with the Vulnerability Assessment Report. The changes will help you enhance your security posture.</p>")
+
+    # 5. Vulnerability observation (all actionable findings)
+    out.append("<h2 class='section'>5. VULNERABILITY OBSERVATION</h2>")
+    out.append("<p class='body'>&#9632; List of all identified vulnerabilities (excluding informational observations).</p>")
+    for f in findings:
+        host_list = f.get("hosts") or []
+        if len(host_list) > OBS_MAX_HOSTS_SHOWN:
+            hosts = ", ".join(host_list[:OBS_MAX_HOSTS_SHOWN]) + f" (+{len(host_list) - OBS_MAX_HOSTS_SHOWN} more)"
+        else:
+            hosts = ", ".join(host_list) if host_list else "Not specified"
+        rtxt = _FB_RISK_TEXT.get(f.get("risk", ""), "#000000")
+        out.append(f"<p class='obs-name'>&#9632; {_esc(f.get('name',''))}</p>")
+        out.append(
+            "<table class='kv'><colgroup><col style='width:130px'/><col/></colgroup><tbody>"
+            f"<tr><th>Risk</th><td style='text-align:center;font-weight:bold;color:{rtxt}'>{_esc(f.get('risk',''))}</td></tr>"
+            f"<tr><th>IP address</th><td>{_esc(hosts)}</td></tr>"
+            f"<tr><th>Description</th><td>{_esc(desc_fn(f))}</td></tr>"
+            f"<tr><th>Impact</th><td>{_esc(impact_fn(f))}</td></tr>"
+            f"<tr><th>Mitigation</th><td>{_esc(mit_fn(f))}</td></tr>"
+            "</tbody></table>")
+
+    # 6. Key contacts
+    contacts = site.get("key_contacts") or []
+    if contacts:
+        out.append("<h2 class='section'>6. KEY CONTACTS</h2>")
+        for c in contacts:
+            line = " &nbsp; ".join(x for x in (_esc(c.get("name")), _esc(c.get("title")), _esc(c.get("email"))) if x)
+            out.append(f"<p class='body'>&#9632; {line}</p>")
+
+    out.append("</body></html>")
+    return "".join(out)
+
+
 def build_styled_gap_report_html(ctx: dict[str, Any], *, include_cover: bool = True) -> str:
     site = ctx["site"]
     client = ctx["client"]

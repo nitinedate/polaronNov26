@@ -54,3 +54,24 @@ Known-good versions (verified rendering the full report): `xhtml2pdf 0.2.28`, `r
 Deploy the updated `gap_assessment_report.py` **and rebuild the API image**, then run the
 diagnostic to confirm. After that the Gap report downloads as PDF; it can no longer come out
 as HTML.
+
+---
+
+## Update: the fallback PDF now renders cleanly (no stray bars)
+When xhtml2pdf is unavailable, the PyMuPDF fallback previously mis-rendered the
+xhtml2pdf-oriented HTML — stray red/gray/multicolour bars over the text — because
+PyMuPDF's Story engine repaints a cell's solid `background-color` onto tall rows
+elsewhere in the document.
+
+Fix: a dedicated Story-safe builder, `build_fallback_report_html(ctx)` in
+`gap_report_template.py`, is now used for the fallback path. It emits only
+Story-friendly markup:
+- fixed-px `<colgroup>` column widths (percent widths aren't honoured by Story),
+- **no solid-background risk cells** — severity is shown with coloured left-border
+  bars + coloured bold text (dark, readable variants), which do not bleed,
+- its own cover page (so the separate cover merge is skipped on this path).
+
+`render_gap_pdf(..., ctx=ctx)` now receives the context and uses this clean HTML
+whenever it falls back to PyMuPDF. Result: even without xhtml2pdf, the Gap report
+is a clean, aligned, colourful PDF. The styled xhtml2pdf render remains the
+high-fidelity default when the engine is healthy.

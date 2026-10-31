@@ -700,6 +700,7 @@ def render_gap_pdf(
     client: str | None = None,
     company: str | None = None,
     report_date: str | None = None,
+    ctx: dict[str, Any] | None = None,
 ) -> bytes | None:
     """Render the gap report to PDF.
 
@@ -708,10 +709,25 @@ def render_gap_pdf(
     Returns None only if BOTH engines fail (callers then raise rather than serve
     HTML). Cover/watermark/page-number post-processing is best-effort: if it
     fails, the un-stamped PDF is still returned rather than lost.
+
+    When the PyMuPDF fallback is used and ``ctx`` is given, the report is rebuilt
+    from a clean, Story-safe HTML (``build_fallback_report_html``) instead of the
+    xhtml2pdf-oriented styled HTML, which PyMuPDF mis-renders (stray bars,
+    overlapping cells). That fallback HTML carries its own cover page, so the
+    separate cover merge is skipped for it.
     """
     body_pdf = _pisa_html_to_pdf(html_content)
+    used_fallback = False
     if body_pdf is None:
-        body_pdf = _fitz_html_to_pdf(html_content)
+        fallback_html = html_content
+        if ctx is not None:
+            try:
+                from app.services.gap_report_template import build_fallback_report_html
+                fallback_html = build_fallback_report_html(ctx)
+            except Exception as exc:
+                log.warning("gap-report PDF: clean fallback HTML build failed (%s); using styled HTML", exc)
+        body_pdf = _fitz_html_to_pdf(fallback_html)
+        used_fallback = True
     if body_pdf is None:
         log.error("gap-report PDF: no PDF engine could render the report")
         return None
@@ -719,7 +735,9 @@ def render_gap_pdf(
     try:
         from app.services.gap_report_template import apply_confidential_watermark, stamp_gap_page_numbers
 
-        if not client:
+        # The clean fallback HTML already contains its own cover, so never prepend
+        # a second cover on that path; just watermark + number it.
+        if not client or used_fallback:
             stamped = apply_confidential_watermark(body_pdf, skip_first_page=False)
             return stamp_gap_page_numbers(stamped)
 
@@ -880,6 +898,7 @@ def export_gap_report(
         client=ctx["client"],
         company=ctx["site"].get("company_name"),
         report_date=ctx.get("report_date"),
+        ctx=ctx,
     )
     if pdf:
         return pdf, "application/pdf", f"gap-assessment-{client_slug}.pdf"
@@ -1212,6 +1231,7 @@ def export_merged_gap_report(
         client=ctx["client"],
         company=ctx["site"].get("company_name"),
         report_date=ctx.get("report_date"),
+        ctx=ctx,
     )
     if pdf:
         return pdf, "application/pdf", f"gap-assessment-{client_slug}-{suffix}.pdf"
