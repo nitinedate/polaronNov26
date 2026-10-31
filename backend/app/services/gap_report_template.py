@@ -224,6 +224,7 @@ def _page_wrap(
     section_bars: list[str] | None = None,
     bottom_bars: list[str] | None = None,
     page_break_before: bool = False,
+    page_break_after: bool = True,
     flow: bool = False,
 ) -> str:
     bars_titles = section_bars if section_bars is not None else bottom_bars
@@ -231,9 +232,10 @@ def _page_wrap(
     for title in bars_titles or []:
         bars += _section_bar(title, large=(title.upper() == "GENERAL SITE REPORT"))
     break_cls = " report-page-break-before" if page_break_before else ""
+    end_cls = " report-page-last" if not page_break_after else ""
     flow_cls = " report-page-flow" if flow else ""
     return (
-        f'<div class="report-page{break_cls}{flow_cls}">'
+        f'<div class="report-page{break_cls}{end_cls}{flow_cls}">'
         f'<div class="page-body">{bars}<div class="page-content">{body}</div></div>'
         f"</div>"
     )
@@ -253,6 +255,9 @@ body {
 .report-page {
   page-break-after: always;
   page-break-inside: avoid;
+}
+.report-page-last {
+  page-break-after: auto;
 }
 .report-page-flow {
   page-break-inside: auto;
@@ -2151,6 +2156,7 @@ def build_styled_gap_report_html(ctx: dict[str, Any], *, include_cover: bool = T
             _contacts_html(contacts),
             page_no,
             section_bars=["6. KEY CONTACTS"],
+            page_break_after=False,
         )
     )
     page_no += 1
