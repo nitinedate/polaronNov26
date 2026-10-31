@@ -1237,7 +1237,7 @@ def _severity_summary_html(summary: dict[str, Any] | None) -> str:
 # findings per printed page. xhtml2pdf (pisa) cannot split one tall <table>
 # across pages — it renders the first page's worth of rows and silently drops
 # the rest — so we emit one self-contained <table> per page instead.
-SUMMARY_ROWS_PER_PAGE = 20
+SUMMARY_ROWS_PER_PAGE = 18
 
 
 def _summary_row_html(idx: int, f: dict[str, Any]) -> str:

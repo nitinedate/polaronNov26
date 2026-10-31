@@ -17,6 +17,7 @@ from app.services.gap_report_llm import enrich_gap_findings
 from app.services.gap_report_template import (
     REPORT_COMPANY,
     REPORT_LOGO_FILE,
+    SUMMARY_ROWS_PER_PAGE,
     build_styled_gap_report_html,
     rebrand_company,
 )
@@ -767,7 +768,8 @@ def _reportlab_summary_page_pdfs(ctx: dict[str, Any]) -> list[bytes]:
     }
     text_by_risk = {"Critical": "#ffffff", "High": "#ffffff", "Medium": "#000000",
                     "Low": "#000000", "Info": "#ffffff", "Total": "#000000"}
-    chunks = [findings[i:i + 20] for i in range(0, len(findings), 20)] or [[]]
+    per_page = SUMMARY_ROWS_PER_PAGE
+    chunks = [findings[i:i + per_page] for i in range(0, len(findings), per_page)] or [[]]
     outputs = []
     for page_idx, chunk in enumerate(chunks):
         story: list[Any] = [_reportlab_section_heading(
@@ -801,7 +803,7 @@ def _reportlab_summary_page_pdfs(ctx: dict[str, Any]) -> list[bytes]:
 
         rows = [[_reportlab_paragraph("Sr No.", bold=True), _reportlab_paragraph("Risk", bold=True),
                  _reportlab_paragraph("Name", bold=True)]]
-        for idx, finding in enumerate(chunk, start=page_idx * 20 + 1):
+        for idx, finding in enumerate(chunk, start=page_idx * per_page + 1):
             risk = str(finding.get("risk") or "")
             rows.append([
                 _reportlab_paragraph(str(idx), size=10),
