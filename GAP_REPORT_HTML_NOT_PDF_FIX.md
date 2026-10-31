@@ -75,3 +75,30 @@ Story-friendly markup:
 whenever it falls back to PyMuPDF. Result: even without xhtml2pdf, the Gap report
 is a clean, aligned, colourful PDF. The styled xhtml2pdf render remains the
 high-fidelity default when the engine is healthy.
+
+---
+
+## Update 2: fallback now matches the full report structure, section-per-page, zero bleed
+Addressing the circled artifacts (stray blue line, grey blocks in blank areas) and the
+structure/pagination requests:
+
+- **No background-color fills anywhere.** PyMuPDF's Story engine repaints a filled cell's
+  colour onto later pages/tall rows (the blue line and grey blocks). The fallback now uses
+  **zero** `background-color`: section headings are blue text + a blue underline, table headers
+  are bold text, and severity uses coloured left-border bars + coloured bold text. With no fills
+  there is nothing to bleed.
+- **Each section on its own page.** The fallback renders **one PyMuPDF Story per section**
+  (cover, document control, TOC, then sections 1-6) and merges them, so every section starts on
+  a fresh page and one section's content can never bleed into another.
+- **Full front-matter restored**, matching the styled report: logo cover page → GENERAL SITE
+  REPORT + REVISION HISTORY + confidential notice → TABLE OF CONTENTS (with real page numbers,
+  computed from the rendered section lengths) → 1. INTRODUCTION … 6. KEY CONTACTS.
+
+New template functions: `build_fallback_sections(ctx)` (one HTML doc per page-group) and
+`build_fallback_toc(page_map)`. New renderer `_fitz_fallback_sections_pdf(ctx)` in
+`gap_assessment_report.py` renders each section as its own Story, counts pages for the TOC, and
+merges. `build_fallback_report_html(ctx)` is kept as a single-document fallback-of-last-resort.
+
+This is still the fallback — the high-fidelity, serif xhtml2pdf report (your attached PDF) remains
+the default whenever xhtml2pdf works. Run `scripts/check_pdf_engine.py` in the API container to
+see why xhtml2pdf is failing there and restore it for the full-fidelity output.

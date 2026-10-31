@@ -694,6 +694,71 @@ def _fitz_html_to_pdf(html_content: str) -> bytes | None:
         return None
 
 
+def _fitz_render_story(fitz, html_content: str) -> bytes:
+    """Render one HTML document as a single Story into its own PDF (its own pages)."""
+    buf = io.BytesIO()
+    writer = fitz.DocumentWriter(buf)
+    mediabox = fitz.Rect(0, 0, 597, 843)
+    where = mediabox + (36, 40, -36, -40)
+    story = fitz.Story(html=html_content)
+    more, guard = 1, 0
+    while more and guard < 4000:
+        dev = writer.begin_page(mediabox)
+        more, _ = story.place(where)
+        story.draw(dev)
+        writer.end_page()
+        guard += 1
+    writer.close()
+    return buf.getvalue()
+
+
+def _fitz_fallback_sections_pdf(ctx: dict[str, Any]) -> bytes | None:
+    """Fallback PDF rendered one section per Story.
+
+    Each report section (cover, document control, TOC, then sections 1-6) is its own
+    Story, so every section starts on a new page and PyMuPDF's background bleed cannot
+    cross between sections. The table of contents is filled in with real page numbers
+    via a single pre-count of each section's rendered page count.
+    """
+    fitz = _import_fitz()
+    if fitz is None:
+        log.error("gap-report PDF: PyMuPDF is not importable; cannot render fallback PDF")
+        return None
+    try:
+        from app.services.gap_report_template import build_fallback_sections, build_fallback_toc
+
+        sections = build_fallback_sections(ctx)
+        # Render each page-group once; count pages to place the TOC numbers.
+        rendered = {k: _fitz_render_story(fitz, html) for k, html in sections.items()}
+        pages = {k: fitz.open(stream=v, filetype="pdf").page_count for k, v in rendered.items()}
+
+        # cover (1..), document control, then TOC (1 page), then numbered sections.
+        cur = 1 + pages["cover"] + pages["docctrl"] + 1  # first numbered section starts here
+        page_map: dict[str, int] = {}
+        for key in ("intro", "overview", "infra", "summary", "observation", "contacts"):
+            page_map[key] = cur
+            cur += pages[key]
+        toc_pdf = _fitz_render_story(fitz, build_fallback_toc(page_map))
+
+        merged = fitz.open(stream=rendered["cover"], filetype="pdf")
+        for part in (rendered["docctrl"], toc_pdf, rendered["intro"], rendered["overview"],
+                     rendered["infra"], rendered["summary"], rendered["observation"], rendered["contacts"]):
+            doc = fitz.open(stream=part, filetype="pdf")
+            if doc.page_count:
+                merged.insert_pdf(doc)
+            doc.close()
+        data = merged.tobytes()
+        merged.close()
+        if len(data) <= 100:
+            return None
+        log.warning("gap-report PDF: rendered with the PyMuPDF fallback (lower fidelity, section-paginated). "
+                    "Restore xhtml2pdf in the API image for the styled report.")
+        return data
+    except Exception as exc:
+        log.error("gap-report PDF: PyMuPDF sectioned fallback failed (%s); trying single-story fallback", exc)
+        return None
+
+
 def render_gap_pdf(
     html_content: str,
     *,
@@ -719,15 +784,21 @@ def render_gap_pdf(
     body_pdf = _pisa_html_to_pdf(html_content)
     used_fallback = False
     if body_pdf is None:
-        fallback_html = html_content
-        if ctx is not None:
-            try:
-                from app.services.gap_report_template import build_fallback_report_html
-                fallback_html = build_fallback_report_html(ctx)
-            except Exception as exc:
-                log.warning("gap-report PDF: clean fallback HTML build failed (%s); using styled HTML", exc)
-        body_pdf = _fitz_html_to_pdf(fallback_html)
         used_fallback = True
+        # Preferred fallback: one Story per section (each section on its own page,
+        # full front-matter, no background bleed). Falls back to a single-Story
+        # render of clean HTML, then to the raw styled HTML, if needed.
+        if ctx is not None:
+            body_pdf = _fitz_fallback_sections_pdf(ctx)
+            if body_pdf is None:
+                try:
+                    from app.services.gap_report_template import build_fallback_report_html
+                    body_pdf = _fitz_html_to_pdf(build_fallback_report_html(ctx))
+                except Exception as exc:
+                    log.warning("gap-report PDF: clean fallback HTML build failed (%s); using styled HTML", exc)
+                    body_pdf = _fitz_html_to_pdf(html_content)
+        else:
+            body_pdf = _fitz_html_to_pdf(html_content)
     if body_pdf is None:
         log.error("gap-report PDF: no PDF engine could render the report")
         return None
