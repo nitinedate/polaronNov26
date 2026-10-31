@@ -64,9 +64,6 @@ TOC_ITEMS: list[tuple[str, str]] = [
     ("KEY CONTACTS", "contacts"),
 ]
 
-FINDINGS_PER_OBS_PAGE = 1
-
-
 def _estimate_gap_observation_pages(
     findings_count: int,
     *,
@@ -75,8 +72,8 @@ def _estimate_gap_observation_pages(
 ) -> int:
     """Printed-page count for TOC.
 
-    Section 5 lists every actionable finding, packed OBS_FINDINGS_PER_PAGE
-    detail blocks per page (no longer capped at 10).
+    Section 5 keeps each actionable finding table on its own page. The shared
+    page-size setting is also used by the styled renderer and TOC calculator.
     """
     if findings_count <= 0:
         return 1
@@ -1696,12 +1693,10 @@ def _contacts_html(contacts: list[dict[str, Any]]) -> str:
     return f"<div class='contacts-block'>{''.join(blocks)}</div>"
 
 
-# Section 5 "VULNERABILITY OBSERVATION" lists every actionable finding (all
-# severities except Info, which is already excluded upstream). Detail blocks are
-# packed this many per page. Each finding's detail fields are length-capped
-# upstream (~520 chars each), so two full blocks fit a page; three overflow and
-# trip xhtml2pdf's "_FrameBreak.wrap" bug, so 2 is the safe maximum.
-OBS_FINDINGS_PER_PAGE = 2
+# Section 5 keeps each finding table together on its own page. This matches the
+# reference report and prevents the PDF engines from leaving an open table at a
+# page boundary when a finding contains long evidence text.
+OBS_FINDINGS_PER_PAGE = 1
 
 # Cap the IP list shown in a finding's detail table so a finding affecting many
 # hosts cannot grow a block tall enough to overflow the page. The full per-host
@@ -1727,10 +1722,7 @@ def _finding_details_pages(findings: list[dict[str, Any]], ctx: dict[str, Any]) 
             section = ["5. VULNERABILITY OBSERVATION"]
         else:
             section = ["5. VULNERABILITY OBSERVATION (CONTINUED)"]
-        # flow=False (page-break-inside:avoid): each page is self-contained so
-        # xhtml2pdf never has to break inside it. page-break-inside:auto pages
-        # trip the engine's "_FrameBreak.wrap" bug once a chunk needs an
-        # internal break, so chunk size is kept small enough to fit one page.
+        # One finding per page keeps the table and its outer border together.
         pages.append((body, section, False))
     return pages
 
@@ -1782,8 +1774,21 @@ th, td { border: 1px solid #808080; padding: 5px 7px; vertical-align: top; text-
 th { font-weight: bold; }
 td.srno { text-align: center; }
 table.sev td { text-align: center; font-weight: bold; font-size: 10pt; }
-table.toc td { border: none; padding: 3px 2px; }
-td.toc-num { text-align: right; width: 56px; }
+table.sev th { background: #eeeeee; text-align: center; }
+table.sev td.sev-critical { background: #c00000; color: #fff; }
+table.sev td.sev-high { background: #ff0000; color: #fff; }
+table.sev td.sev-medium { background: #ffc000; color: #000; }
+table.sev td.sev-low { background: #92d050; color: #000; }
+table.sev td.sev-info { background: #5b9bd5; color: #fff; }
+table.sev td.sev-total { background: #fff; color: #000; }
+p.toc-title-band { width: 525px; background: #7f7f7f; color: #fff; font-weight: bold; text-align: center; padding: 9px; margin: 0 0 4px; }
+p.toc-row { font-size: 11pt; margin: 7px 0; white-space: nowrap; }
+div.toc-footer-band { width: 525px; height: 18px; background: #b5b5b5; margin: 4px 0 0; }
+table.summary td.risk-cell { font-weight: bold; text-align: center; }
+table.summary th { background: #d9d9d9; }
+table.kv { page-break-inside: avoid; break-inside: avoid; }
+table.kv tr { page-break-inside: avoid; break-inside: avoid; }
+table.kv td.risk-cell { font-weight: bold; text-align: center; }
 </style>"""
 
 # Readable text colours for the fallback (no cell fills). Darkened so Medium/Low
@@ -1877,14 +1882,13 @@ def _fallback_section_bodies(ctx: dict[str, Any]) -> dict[str, str]:
              f"<p class='body'><strong>FIREWALL:</strong> {_esc(_site_value(fw.get('make_model') or site.get('firewall_summary'), 'No Firewall'))}</p>")
 
     # --- 4. Summary ---
-    sev = []
-    for key, label, border in (("Critical", "Critical", COLOR_CRITICAL), ("High", "High", COLOR_HIGH),
-                               ("Medium", "Medium", COLOR_MEDIUM), ("Low", "Low", COLOR_LOW),
-                               ("Info", "Info", COLOR_INFO), ("total", "Total", "#404040")):
-        sev.append(f"<td style='border-left:7px solid {border};color:{_FB_RISK_TEXT.get(key, '#000000')}'>"
-                   f"{label}<br/>{_esc(fs.get(key, 0))}</td>")
+    sev_headers = "".join(f"<th>{label}</th>" for label in ("Critical", "High", "Medium", "Low", "Info", "Total"))
+    sev_values = "".join(
+        f"<td class='sev-{key.lower()}'>{_esc(fs.get(key, 0))}</td>"
+        for key in ("Critical", "High", "Medium", "Low", "Info")
+    ) + f"<td class='sev-total'>{_esc(fs.get('total', len(findings)))}</td>"
     summary_parts = ["<h2 class='section'>4. SUMMARY OF VULNERABILITY ASSESSMENT</h2>",
-                     f"<table class='sev'><tbody><tr>{''.join(sev)}</tr></tbody></table>"]
+                     f"<table class='sev'><tbody><tr>{sev_headers}</tr><tr>{sev_values}</tr></tbody></table>"]
     if fs.get("actionable") is not None:
         summary_parts.append(
             f"<p class='body'><strong>Actionable findings:</strong> {_esc(fs.get('actionable'))} &nbsp; | &nbsp; "
@@ -1892,9 +1896,10 @@ def _fallback_section_bodies(ctx: dict[str, Any]) -> dict[str, str]:
     rows = []
     for idx, f in enumerate(findings, start=1):
         risk = f.get("risk", "")
+        risk_bg = _RISK_BG.get(risk, "#808080")
+        risk_text = "#000000" if risk in {"Medium", "Low"} else "#ffffff"
         rows.append(f"<tr><td class='srno'>{idx}</td>"
-                    f"<td style='border-left:6px solid {_RISK_BG.get(risk, '#808080')};"
-                    f"color:{_FB_RISK_TEXT.get(risk, '#000000')};font-weight:bold;text-align:center'>"
+                    f"<td class='risk-cell' bgcolor='{risk_bg}' style='background-color:{risk_bg};color:{risk_text}'>"
                     f"{_esc(str(risk).upper())}</td>"
                     f"<td><strong>{_esc(f.get('name', ''))}</strong></td></tr>")
     summary_parts.append(
@@ -1917,9 +1922,12 @@ def _fallback_section_bodies(ctx: dict[str, Any]) -> dict[str, str]:
             hosts = ", ".join(host_list) if host_list else "Not specified"
         rtxt = _FB_RISK_TEXT.get(f.get("risk", ""), "#000000")
         obs_parts.append(f"<p class='obs-name'>&#9632; {_esc(f.get('name', ''))}</p>")
+        risk = f.get("risk", "")
+        risk_bg = _RISK_BG.get(risk, "#808080")
+        risk_text = "#000000" if risk in {"Medium", "Low"} else "#ffffff"
         obs_parts.append(
             "<table class='kv'><colgroup><col style='width:130px'/><col/></colgroup><tbody>"
-            f"<tr><th>Risk</th><td style='text-align:center;font-weight:bold;color:{rtxt}'>{_esc(f.get('risk', ''))}</td></tr>"
+            f"<tr><th>Risk</th><td class='risk-cell' bgcolor='{risk_bg}' style='background-color:{risk_bg};text-align:center;font-weight:bold;color:{risk_text}'>{_esc(risk)}</td></tr>"
             f"<tr><th>IP address</th><td>{_esc(hosts)}</td></tr>"
             f"<tr><th>Description</th><td>{_esc(desc_fn(f))}</td></tr>"
             f"<tr><th>Impact</th><td>{_esc(impact_fn(f))}</td></tr>"
@@ -1945,13 +1953,107 @@ def build_fallback_sections(ctx: dict[str, Any]) -> dict[str, str]:
 
 def build_fallback_toc(page_map: dict[str, int] | None = None) -> str:
     """Table-of-contents page (its own Story). page_map maps section key -> page number."""
+    return _fb_doc(_fallback_toc_body(page_map))
+
+
+def _fallback_toc_body(page_map: dict[str, int] | None = None) -> str:
+    """TOC markup shared by the section renderer and the single-document fallback."""
     page_map = page_map or {}
     rows = []
     for i, (label, key) in enumerate(_FB_TOC_ENTRIES, start=1):
         pg = page_map.get(key, "")
-        rows.append(f"<tr><td>{i}. &nbsp; {label}</td><td class='toc-num'>{_esc(pg)}</td></tr>")
-    return _fb_doc("<p class='title'>TABLE OF CONTENTS</p>"
-                   f"<table class='toc'><tbody>{''.join(rows)}</tbody></table>")
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+
+        prefix = f"{i}.   {label}"
+        available = 505  # printable content width after page margins
+        title_width = stringWidth(prefix, "Helvetica", 11)
+        page_width = stringWidth(str(pg), "Helvetica", 11)
+        dot_width = stringWidth(".", "Helvetica", 11) or 3
+        spacer_width = stringWidth("   ", "Helvetica", 11)
+        dots = "." * max(3, int((available - title_width - page_width - spacer_width) / dot_width))
+        rows.append(f"<p class='toc-row'>{_esc(prefix)}{dots}&nbsp;&nbsp;&nbsp;{_esc(pg)}</p>")
+    toc = ("<p class='toc-title-band' style='background-color:#7f7f7f;color:#ffffff'>TABLE OF CONTENTS</p>"
+           f"{''.join(rows)}"
+           "<div class='toc-footer-band' style='background-color:#b5b5b5'>&nbsp;</div>")
+    return toc
+
+
+def build_fallback_summary_pages(ctx: dict[str, Any], *, per_page: int = SUMMARY_ROWS_PER_PAGE) -> list[str]:
+    """Build bounded summary pages so colored table cells cannot bleed across pages."""
+    findings = ctx.get("findings") or []
+    fs = ctx.get("finding_summary") or {}
+    chunks = [findings[i:i + per_page] for i in range(0, len(findings), per_page)] or [[]]
+    pages: list[str] = []
+    for page_idx, chunk in enumerate(chunks):
+        title = "4. SUMMARY OF VULNERABILITY ASSESSMENT" + (" (CONTINUED)" if page_idx else "")
+        body = [f"<h2 class='section'>{title}</h2>"]
+        if page_idx == 0:
+            labels = ("Critical", "High", "Medium", "Low", "Info", "Total")
+            severity_bg = {"Critical": COLOR_CRITICAL, "High": COLOR_HIGH, "Medium": COLOR_MEDIUM,
+                           "Low": COLOR_LOW, "Info": COLOR_INFO, "Total": "#ffffff"}
+            severity_fg = {"Critical": "#ffffff", "High": "#ffffff", "Medium": "#000000",
+                           "Low": "#000000", "Info": "#ffffff", "Total": "#000000"}
+            body.append("<table class='sev'><colgroup>" + "".join("<col style='width:87px'/>" for _ in labels)
+                        + "</colgroup><tbody><tr>" + "".join(
+                            f"<th bgcolor='#eeeeee' style='background-color:#eeeeee'>{x}</th>" for x in labels
+                        ) + "</tr><tr>")
+            body.extend(
+                f"<td class='sev-{key.lower()}' bgcolor='{severity_bg[key]}' "
+                f"style='background-color:{severity_bg[key]};color:{severity_fg[key]}'>{_esc(fs.get(key, 0))}</td>"
+                for key in labels[:-1]
+            )
+            body.append(f"<td class='sev-total'>{_esc(fs.get('total', len(findings)))}</td></tr></tbody></table>")
+            if fs.get("actionable") is not None:
+                body.append(f"<p class='body'><strong>Actionable findings:</strong> {_esc(fs.get('actionable'))} &nbsp; | &nbsp; "
+                            f"<strong>Informational observations:</strong> {_esc(fs.get('informational', fs.get('Info', 0)))}</p>")
+        rows = []
+        for idx, f in enumerate(chunk, start=page_idx * per_page + 1):
+            risk = f.get("risk", "")
+            bg = _RISK_BG.get(risk, "#808080")
+            fg = "#000000" if risk in {"Medium", "Low"} else "#ffffff"
+            rows.append(f"<tr><td class='srno'>{idx}</td><td class='risk-cell' bgcolor='{bg}' style='background-color:{bg};color:{fg}'>"
+                        f"{_esc(str(risk).upper())}</td><td><strong>{_esc(f.get('name', ''))}</strong></td></tr>")
+        body.append("<table class='summary'><colgroup><col style='width:70px'/><col style='width:120px'/><col style='width:335px'/></colgroup>"
+                    "<thead><tr><th bgcolor='#d9d9d9' style='background-color:#d9d9d9'>Sr No.</th>"
+                    "<th bgcolor='#d9d9d9' style='background-color:#d9d9d9'>Risk</th>"
+                    "<th bgcolor='#d9d9d9' style='background-color:#d9d9d9'>Name</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>")
+        if page_idx == len(chunks) - 1 and findings:
+            body.append("<p class='body'><strong>NOTES:</strong> Kindly implement the changes mentioned in the solution set attached with the "
+                        "Vulnerability Assessment Report. The changes will help you enhance your security posture.</p>")
+        pages.append("".join(body))
+    return [_fb_doc(page) for page in pages]
+
+
+def build_fallback_observation_pages(ctx: dict[str, Any]) -> list[str]:
+    """Render one complete finding table per Story/page to keep its borders closed."""
+    findings = ctx.get("findings") or []
+    desc_fn = ctx.get("_finding_description") or (lambda f: f.get("description") or f.get("name") or "")
+    impact_fn = ctx.get("_impact_text") or (lambda f: "")
+    mit_fn = ctx.get("_mitigation_text") or (lambda f: f.get("remediation") or "")
+    if not findings:
+        return [_fb_doc("<h2 class='section'>5. VULNERABILITY OBSERVATION</h2><p class='body'><em>No observations recorded for this case.</em></p>")]
+    pages = []
+    for idx, f in enumerate(findings):
+        title = "5. VULNERABILITY OBSERVATION" if idx == 0 else "5. VULNERABILITY OBSERVATION (CONTINUED)"
+        host_list = f.get("hosts") or []
+        hosts = ", ".join(host_list[:OBS_MAX_HOSTS_SHOWN]) if host_list else "Not specified"
+        if len(host_list) > OBS_MAX_HOSTS_SHOWN:
+            hosts += f" (+{len(host_list) - OBS_MAX_HOSTS_SHOWN} more)"
+        risk = f.get("risk", "")
+        bg = _RISK_BG.get(risk, "#808080")
+        fg = "#000000" if risk in {"Medium", "Low"} else "#ffffff"
+        body = [f"<h2 class='section'>{title}</h2>"]
+        if idx == 0:
+            body.append("<p class='body'>List of all identified vulnerabilities (excluding informational observations).</p>")
+        body.append(f"<p class='obs-name'>&#9632; {_esc(f.get('name', ''))}</p>")
+        body.append("<table class='kv'><colgroup><col style='width:130px'/><col style='width:395px'/></colgroup><tbody>"
+                    f"<tr><th>Risk</th><td class='risk-cell' bgcolor='{bg}' style='background-color:{bg};color:{fg}'>{_esc(risk)}</td></tr>"
+                    f"<tr><th>IP address</th><td>{_esc(hosts)}</td></tr>"
+                    f"<tr><th>Description</th><td>{_esc(desc_fn(f))}</td></tr>"
+                    f"<tr><th>Impact</th><td>{_esc(impact_fn(f))}</td></tr>"
+                    f"<tr><th>Mitigation</th><td>{_esc(mit_fn(f))}</td></tr></tbody></table>")
+        pages.append(_fb_doc("".join(body)))
+    return pages
 
 
 def build_fallback_report_html(ctx: dict[str, Any]) -> str:
@@ -1961,13 +2063,17 @@ def build_fallback_report_html(ctx: dict[str, Any]) -> str:
     in render_gap_pdf is preferred because it puts each section on its own page.
     """
     b = _fallback_section_bodies(ctx)
-    toc_body = ("<p class='title'>TABLE OF CONTENTS</p><table class='toc'><tbody>"
-                + "".join(f"<tr><td>{i}. &nbsp; {label}</td></tr>"
-                          for i, (label, _k) in enumerate(_FB_TOC_ENTRIES, start=1))
-                + "</tbody></table>")
-    order = ["cover", "docctrl"]
-    body = "".join(b[k] for k in order) + toc_body + "".join(
-        b[k] for k in ("intro", "overview", "infra", "summary", "observation", "contacts"))
+    page_map = {key: i for i, key in enumerate(("intro", "overview", "infra"), start=4)}
+    summary_pages = build_fallback_summary_pages(ctx)
+    observation_pages = build_fallback_observation_pages(ctx)
+    page_map["summary"] = 6
+    page_map["observation"] = 6 + len(summary_pages)
+    page_map["contacts"] = page_map["observation"] + len(observation_pages)
+    toc_body = _fallback_toc_body(page_map)
+    body = b["cover"] + b["docctrl"] + toc_body + b["intro"] + b["overview"] + b["infra"]
+    body += "".join(f"<div style='page-break-before:always'>{page}</div>" for page in summary_pages)
+    body += "".join(f"<div style='page-break-before:always'>{page}</div>" for page in observation_pages)
+    body += b["contacts"]
     return _fb_doc(body)
 
 

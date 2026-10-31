@@ -102,3 +102,12 @@ merges. `build_fallback_report_html(ctx)` is kept as a single-document fallback-
 This is still the fallback — the high-fidelity, serif xhtml2pdf report (your attached PDF) remains
 the default whenever xhtml2pdf works. Run `scripts/check_pdf_engine.py` in the API container to
 see why xhtml2pdf is failing there and restore it for the full-fidelity output.
+
+## Update 3: keep finding tables closed and align fallback pages with the reference PDF
+The fallback now paginates one vulnerability finding table per page and renders each summary
+chunk as its own bounded Story. This prevents a long description or mitigation row from leaving
+an open table border at a page break. Severity-count cells and risk cells use the reference
+PDF's severity fills. The fallback contents page now has aligned section numbers, dotted leaders,
+right-aligned page numbers, and the gray title/footer bars. Its page numbers are calculated from
+the rendered summary and observation page counts. The primary xhtml2pdf path also uses one
+finding detail table per page so the two renderers follow the same pagination rule.

@@ -712,6 +712,166 @@ def _fitz_render_story(fitz, html_content: str) -> bytes:
     return buf.getvalue()
 
 
+def _reportlab_story_pdf(flowables: list[Any]) -> bytes:
+    """Render one bounded page-group with fixed-width, non-splitting tables."""
+    from reportlab.platypus import SimpleDocTemplate
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=(597, 843), leftMargin=36, rightMargin=36, topMargin=40, bottomMargin=40,
+        title="Gap Assessment Report",
+    )
+    doc.build(flowables)
+    return buf.getvalue()
+
+
+def _reportlab_section_heading(title: str) -> Any:
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, Table, TableStyle
+
+    style = ParagraphStyle("GapSection", fontName="Helvetica-Bold", fontSize=15, leading=19,
+                           textColor=colors.HexColor("#1f3860"))
+    band = Table([[Paragraph(_esc(title), style)]], colWidths=[525], hAlign="LEFT")
+    band.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LINEBELOW", (0, 0), (-1, -1), 3, colors.HexColor("#446ec4")),
+    ]))
+    return band
+
+
+def _reportlab_paragraph(text: Any, *, bold: bool = False, color: str | None = None, size: float = 10.5) -> Any:
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph
+
+    style = ParagraphStyle(
+        "GapBody", fontName="Helvetica-Bold" if bold else "Helvetica", fontSize=size,
+        leading=size * 1.25, textColor=colors.HexColor(color) if color else colors.black,
+        spaceAfter=0,
+    )
+    value = _esc(str(text or "")).replace("\n", "<br/>")
+    return Paragraph(value, style)
+
+
+def _reportlab_summary_page_pdfs(ctx: dict[str, Any]) -> list[bytes]:
+    from reportlab.lib import colors
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+
+    findings = ctx.get("findings") or []
+    summary = ctx.get("finding_summary") or {}
+    colors_by_risk = {
+        "Critical": "#c00000", "High": "#ff0000", "Medium": "#ffc000",
+        "Low": "#92d050", "Info": "#5b9bd5", "Total": "#ffffff",
+    }
+    text_by_risk = {"Critical": "#ffffff", "High": "#ffffff", "Medium": "#000000",
+                    "Low": "#000000", "Info": "#ffffff", "Total": "#000000"}
+    chunks = [findings[i:i + 20] for i in range(0, len(findings), 20)] or [[]]
+    outputs = []
+    for page_idx, chunk in enumerate(chunks):
+        story: list[Any] = [_reportlab_section_heading(
+            "4. SUMMARY OF VULNERABILITY ASSESSMENT" + (" (CONTINUED)" if page_idx else "")
+        ), Spacer(1, 12)]
+        if page_idx == 0:
+            labels = ["Critical", "High", "Medium", "Low", "Info", "Total"]
+            counts = [summary.get(key, 0) for key in labels[:-1]] + [summary.get("total", len(findings))]
+            sev = Table([labels, [str(x) for x in counts]], colWidths=[87.5] * 6, hAlign="LEFT")
+            styles = [
+                ("GRID", (0, 0), (-1, -1), 0.7, colors.HexColor("#808080")),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+            for col, label in enumerate(labels):
+                styles.append(("BACKGROUND", (col, 1), (col, 1), colors.HexColor(colors_by_risk[label])))
+                styles.append(("TEXTCOLOR", (col, 1), (col, 1), colors.HexColor(text_by_risk[label])))
+            sev.setStyle(TableStyle(styles))
+            story.extend([sev, Spacer(1, 8)])
+            if summary.get("actionable") is not None:
+                story.append(_reportlab_paragraph(
+                    f"Actionable findings: {summary.get('actionable')}  |  Informational observations: "
+                    f"{summary.get('informational', summary.get('Info', 0))}", bold=True
+                ))
+                story.append(Spacer(1, 8))
+
+        rows = [[_reportlab_paragraph("Sr No.", bold=True), _reportlab_paragraph("Risk", bold=True),
+                 _reportlab_paragraph("Name", bold=True)]]
+        for idx, finding in enumerate(chunk, start=page_idx * 20 + 1):
+            risk = str(finding.get("risk") or "")
+            rows.append([
+                _reportlab_paragraph(str(idx), size=10),
+                _reportlab_paragraph(risk.upper(), bold=True,
+                                     color=text_by_risk.get(risk, "#ffffff"), size=10),
+                _reportlab_paragraph(finding.get("name", ""), bold=True, size=10),
+            ])
+        table = Table(rows, colWidths=[70, 120, 335], repeatRows=1, hAlign="LEFT")
+        table_style = [
+            ("GRID", (0, 0), (-1, -1), 0.8, colors.HexColor("#808080")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d9d9d9")),
+            ("ALIGN", (0, 0), (1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]
+        for row_idx, finding in enumerate(chunk, start=1):
+            table_style.append(("BACKGROUND", (1, row_idx), (1, row_idx), colors.HexColor(colors_by_risk.get(finding.get("risk"), "#808080"))))
+        table.setStyle(TableStyle(table_style))
+        story.append(table)
+        if page_idx == len(chunks) - 1 and findings:
+            story.extend([Spacer(1, 10), _reportlab_paragraph("NOTES:", bold=True, size=11),
+                          _reportlab_paragraph("Kindly implement the changes mentioned in the solution set attached with the Vulnerability Assessment Report. "
+                                               "The changes will help you enhance your security posture.")])
+        outputs.append(_reportlab_story_pdf(story))
+    return outputs
+
+
+def _reportlab_observation_page_pdfs(ctx: dict[str, Any]) -> list[bytes]:
+    from reportlab.lib import colors
+    from reportlab.platypus import Spacer, Table, TableStyle
+
+    findings = ctx.get("findings") or []
+    risk_bg = {"Critical": "#c00000", "High": "#ff0000", "Medium": "#ffc000", "Low": "#92d050", "Info": "#5b9bd5"}
+    outputs = []
+    if not findings:
+        return [_reportlab_story_pdf([_reportlab_section_heading("5. VULNERABILITY OBSERVATION"), Spacer(1, 12),
+                                     _reportlab_paragraph("No observations recorded for this case.")])]
+    for idx, finding in enumerate(findings):
+        risk = str(finding.get("risk") or "")
+        fg = "#000000" if risk in {"Medium", "Low"} else "#ffffff"
+        hosts = finding.get("hosts") or []
+        host_text = ", ".join(hosts[:25]) if hosts else "Not specified"
+        if len(hosts) > 25:
+            host_text += f" (+{len(hosts) - 25} more)"
+        title = "5. VULNERABILITY OBSERVATION" + (" (CONTINUED)" if idx else "")
+        story: list[Any] = [_reportlab_section_heading(title), Spacer(1, 10)]
+        if idx == 0:
+            story.extend([_reportlab_paragraph("List of all identified vulnerabilities (excluding informational observations)."), Spacer(1, 10)])
+        story.extend([_reportlab_paragraph(f"Finding: {finding.get('name', '')}", bold=True, color="#c00000", size=11), Spacer(1, 5)])
+        rows = [
+            [_reportlab_paragraph("Risk", bold=True), _reportlab_paragraph(risk, bold=True, color=fg)],
+            [_reportlab_paragraph("IP address", bold=True), _reportlab_paragraph(host_text)],
+            [_reportlab_paragraph("Description", bold=True), _reportlab_paragraph(_finding_description(finding))],
+            [_reportlab_paragraph("Impact", bold=True), _reportlab_paragraph(_finding_impact(finding))],
+            [_reportlab_paragraph("Mitigation", bold=True), _reportlab_paragraph(_finding_mitigation_paragraph(finding))],
+        ]
+        table = Table(rows, colWidths=[130, 395], hAlign="LEFT", splitByRow=0)
+        style = [
+            ("GRID", (0, 0), (-1, -1), 0.8, colors.HexColor("#808080")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BACKGROUND", (1, 0), (1, 0), colors.HexColor(risk_bg.get(risk, "#808080"))),
+        ]
+        table.setStyle(TableStyle(style))
+        story.append(table)
+        outputs.append(_reportlab_story_pdf(story))
+    return outputs
+
+
 def _fitz_fallback_sections_pdf(ctx: dict[str, Any]) -> bytes | None:
     """Fallback PDF rendered one section per Story.
 
@@ -725,24 +885,50 @@ def _fitz_fallback_sections_pdf(ctx: dict[str, Any]) -> bytes | None:
         log.error("gap-report PDF: PyMuPDF is not importable; cannot render fallback PDF")
         return None
     try:
-        from app.services.gap_report_template import build_fallback_sections, build_fallback_toc
+        from app.services.gap_report_template import (
+            build_fallback_sections,
+            build_fallback_toc,
+        )
 
         sections = build_fallback_sections(ctx)
-        # Render each page-group once; count pages to place the TOC numbers.
-        rendered = {k: _fitz_render_story(fitz, html) for k, html in sections.items()}
-        pages = {k: fitz.open(stream=v, filetype="pdf").page_count for k, v in rendered.items()}
+        # Isolate every colored summary chunk and each finding table in its own
+        # Story. A Story must never carry a large table row across page boundaries.
+        static_keys = ("cover", "docctrl", "intro", "overview", "infra", "contacts")
+        rendered = {k: _fitz_render_story(fitz, sections[k]) for k in static_keys}
+        page_counts = {}
+        for key, data in rendered.items():
+            with fitz.open(stream=data, filetype="pdf") as part:
+                page_counts[key] = part.page_count
+
+        summary_parts = _reportlab_summary_page_pdfs(ctx)
+        observation_parts = _reportlab_observation_page_pdfs(ctx)
+
+        def rendered_page_count(parts: list[bytes]) -> int:
+            count = 0
+            for part in parts:
+                with fitz.open(stream=part, filetype="pdf") as document:
+                    count += document.page_count
+            return count
 
         # cover (1..), document control, then TOC (1 page), then numbered sections.
-        cur = 1 + pages["cover"] + pages["docctrl"] + 1  # first numbered section starts here
+        cur = 1 + page_counts["cover"] + page_counts["docctrl"] + 1  # first numbered section starts here
         page_map: dict[str, int] = {}
-        for key in ("intro", "overview", "infra", "summary", "observation", "contacts"):
+        for key in ("intro", "overview", "infra"):
             page_map[key] = cur
-            cur += pages[key]
+            cur += page_counts[key]
+        page_map["summary"] = cur
+        cur += rendered_page_count(summary_parts)
+        page_map["observation"] = cur
+        cur += rendered_page_count(observation_parts)
+        page_map["contacts"] = cur
         toc_pdf = _fitz_render_story(fitz, build_fallback_toc(page_map))
 
         merged = fitz.open(stream=rendered["cover"], filetype="pdf")
-        for part in (rendered["docctrl"], toc_pdf, rendered["intro"], rendered["overview"],
-                     rendered["infra"], rendered["summary"], rendered["observation"], rendered["contacts"]):
+        parts_to_merge = [rendered["docctrl"], toc_pdf, rendered["intro"], rendered["overview"], rendered["infra"]]
+        parts_to_merge.extend(summary_parts)
+        parts_to_merge.extend(observation_parts)
+        parts_to_merge.append(rendered["contacts"])
+        for part in parts_to_merge:
             doc = fitz.open(stream=part, filetype="pdf")
             if doc.page_count:
                 merged.insert_pdf(doc)
@@ -781,6 +967,16 @@ def render_gap_pdf(
     overlapping cells). That fallback HTML carries its own cover page, so the
     separate cover merge is skipped for it.
     """
+    if ctx is not None:
+        # The raw export context is also passed to the fallback renderer. Supply
+        # the same narrative formatters used by build_gap_report_html so Impact
+        # and Mitigation cells never become blank on the fallback path.
+        ctx = {
+            **ctx,
+            "_finding_description": _finding_description,
+            "_impact_text": _finding_impact,
+            "_mitigation_text": _finding_mitigation_paragraph,
+        }
     body_pdf = _pisa_html_to_pdf(html_content)
     used_fallback = False
     if body_pdf is None:

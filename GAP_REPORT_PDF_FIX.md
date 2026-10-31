@@ -20,22 +20,22 @@ continuation page is titled "… (CONTINUED)". Verified: all 153 rows + NOTES re
 vulnerabilities".
 
 **Fix:** shows **every actionable finding** (all severities except Info — Info is
-already excluded upstream), packed **2 detail tables per page** in the same visual
+already excluded upstream), packed **1 detail table per page** in the same visual
 style, with a "… (CONTINUED)" header. Intro now reads "List of all identified
 vulnerabilities (excluding informational observations)." The DOCX export
 (`gap_assessment_report.py`) had the same `findings[:10]` cap — also removed.
 
 ### Tuning knobs (top of the respective functions)
 - `SUMMARY_ROWS_PER_PAGE = 20` — summary rows per page.
-- `OBS_FINDINGS_PER_PAGE = 2` — observation blocks per page. **Do not raise above 2:**
-  3 full detail blocks overflow a page and trip xhtml2pdf's `_FrameBreak.wrap` crash.
+- `OBS_FINDINGS_PER_PAGE = 1` — observation blocks per page. Keeping each complete
+  table on its own page prevents long description or mitigation rows from being split.
 - `OBS_MAX_HOSTS_SHOWN = 25` — caps the IP list in a finding's detail table so a
   finding hitting many hosts can't overflow a page (full host list stays in the
   Solution Set export).
 
 ## Verified
 - All 153 summary rows present (1→153) + NOTES; 8 summary pages.
-- All 153 findings in section 5; 77 observation pages; 2 per page.
+- All 153 findings in section 5; one complete observation table per page.
 - TOC page numbers recomputed for multi-page summary + full observation list.
 - Existing unit-test assertions (`test_summary_table_uses_full_risk_cell`,
   `test_toc_leader_dots_fill_to_page_number`) still pass.
