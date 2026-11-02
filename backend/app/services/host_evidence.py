@@ -3056,7 +3056,9 @@ def register_segments(
     }
     normalized_paths = [str(item.resolve()).replace("\\", "/").casefold() for item in paths]
     if normalized_paths and all(item in existing_by_path for item in normalized_paths):
-        from app.services.disk import segment_readiness
+        # segment_readiness is imported at module scope. A nested import in
+        # this conditional would make it a function-local name, producing an
+        # UnboundLocalError on new registrations that bypass this fast path.
         from app.services.mobile_os import load_job_disk_source
 
         ready = segment_readiness(existing_rows)
