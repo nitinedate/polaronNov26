@@ -8,6 +8,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -2164,6 +2165,40 @@ def list_host_folder_status(
     }
 
 
+class RegistrationStatusBody(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+    expected_names: list[str] = Field(default_factory=list, max_length=5000)
+
+
+@router.post("/jobs/{job_id}/evidence/registration-status")
+def evidence_registration_status(
+    job_id: str,
+    body: RegistrationStatusBody,
+    db: Session = Depends(firm_db),
+    current: CurrentUser = Depends(require_firm_permission("job:read")),
+):
+    """Read committed segments for ONE source directory; never infer from job totals."""
+    _ensure_job(db, job_id)
+    from app.services.host_evidence import resolve_host_path
+    from app.services.registration_status import registration_snapshot
+
+    try:
+        folder = resolve_host_path(body.path, strict=True, job_id=job_id)
+        if folder.is_file():
+            folder = folder.parent
+    except (ValueError, OSError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "evidence_path_unavailable", "message": str(exc)}},
+        ) from exc
+    rows = fetchall(
+        db,
+        "SELECT host_path, original_name FROM evidence_files WHERE job_id=:job_id AND host_path IS NOT NULL",
+        {"job_id": job_id},
+    )
+    return {"job_id": job_id, "path": body.path, **registration_snapshot(rows, str(folder.resolve()), body.expected_names)}
+
+
 @router.post("/jobs/{job_id}/evidence/ingest-path")
 def ingest_host_path(
     job_id: str,
@@ -2203,6 +2238,27 @@ def ingest_host_path(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"error": {"code": "register_failed", "message": str(e)}})
+
+    # A selected source must be wholly registered. Otherwise an E01/E02 set
+    # might appear ready after one fragment, and a single-directory job could
+    # start extraction with incomplete input before the browser notices.
+    if body.selected_names:
+        seen = {str(f.get("original_name") or "").casefold() for f in result.get("accepted") or []}
+        missing = [n for n in body.selected_names if n.casefold() not in seen]
+        if missing:
+            db.commit()  # retain any segments already registered for an idempotent retry
+            raise HTTPException(
+                status_code=409,
+                detail={"error": {
+                    "code": "partial_segment_registration",
+                    "message": (
+                        f"Only {len(body.selected_names) - len(missing)}/{len(body.selected_names)} "
+                        f"segment(s) registered for selected directory {body.path}. "
+                        f"Missing: {', '.join(missing[:5])}. "
+                        "Check the Extraction Log or API logs, then retry without deleting the job."
+                    ),
+                }},
+            )
 
     # Freeze the profile with this registered source before extraction starts.
     # Never change an already extracted source's processing policy.

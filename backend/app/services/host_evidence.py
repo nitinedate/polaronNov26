@@ -3154,6 +3154,8 @@ def register_segments(
     group_id = str(uuid.uuid4())
     total = len(readable)
     skipped = 0
+    failed_names: list[str] = []
+    first_failure: str = ""
     from app.db.sql_helpers import rollback_aborted_transaction
     from app.services.pipeline_orchestrator import patch_segment_registration_orchestration
 
@@ -3177,6 +3179,9 @@ def register_segments(
                 stage="evidence_register",
             )
             skipped += 1
+            failed_names.append(fp.name)
+            if not first_failure:
+                first_failure = f"{fp.name}: {type(exc).__name__}: {str(exc)[:180]}"
             patch_segment_registration_orchestration(
                 db, job_id, processed=idx, total=total, current_name=fp.name, skipped=skipped
             )
@@ -3204,6 +3209,9 @@ def register_segments(
                 stage="evidence_register",
             )
             skipped += 1
+            failed_names.append(fp.name)
+            if not first_failure:
+                first_failure = f"{fp.name}: {type(exc).__name__}: {str(exc)[:180]}"
             patch_segment_registration_orchestration(
                 db, job_id, processed=idx, total=total, current_name=fp.name, skipped=skipped
             )
@@ -3255,6 +3263,9 @@ def register_segments(
                 stage="evidence_register",
             )
             skipped += 1
+            failed_names.append(fp.name)
+            if not first_failure:
+                first_failure = f"{fp.name}: {type(exc).__name__}: {str(exc)[:180]}"
             patch_segment_registration_orchestration(
                 db, job_id, processed=idx, total=total, current_name=fp.name, skipped=skipped
             )
@@ -3264,8 +3275,17 @@ def register_segments(
         raise ValueError(
             "No disk segments registered. The folder was listed, but files could not "
             "be committed. If you attached a new drive, wait for it to remount, then Try again."
+            + (f" First failed segment: {first_failure}" if first_failure else "")
         )
 
+    if failed_names:
+        write_disk_log(
+            db, job_id,
+            f"Registration incomplete for {display_folder}: {len(accepted)}/{total} committed, "
+            f"{len(failed_names)} failed. First failure: {first_failure}",
+            stage="evidence_register",
+            metadata={"source_directory": display_folder, "failed_names": failed_names[:20]},
+        )
     ev = fetchall(db, "SELECT original_name, host_path, storage_uri, status FROM evidence_files WHERE job_id=:job_id", {"job_id": job_id})
     sr = segment_readiness(ev)
     write_disk_log(

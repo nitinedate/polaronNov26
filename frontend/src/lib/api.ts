@@ -264,13 +264,19 @@ export async function request<T = any>(path: string, opts: RequestOptions = {}):
 
   if (!res.ok) {
     const data = await parse(res);
-    const err = data?.error;
+    // FastAPI HTTPException wraps the application's structured error under
+    // `detail.error`. Do not replace its actual registration/mount/SQL reason
+    // with a generic "Bad Request" or "Conflict" in the Get segments dialog.
+    const err = data?.error ?? data?.detail?.error;
+    const detailMessage = typeof data?.detail === "string"
+      ? data.detail
+      : typeof data?.detail?.message === "string" ? data.detail.message : undefined;
     const fallback =
       res.status === 502
         ? `Bad Gateway (502): the ${SERVICE_LABEL[inferApiService(path, opts.service)] ?? "product"} API is not reachable. ` +
           "It is stopped, still starting, or failed to start; check its containers, then try again."
         : res.statusText;
-    throw new ApiError(res.status, err?.code || "error", err?.message || fallback);
+    throw new ApiError(res.status, err?.code || "error", err?.message || detailMessage || fallback);
   }
   return (await parse(res)) as T;
 }

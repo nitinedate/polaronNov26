@@ -1222,7 +1222,8 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
           return;
         }
         if (multiple && !directoryRegisteredRef.current) {
-          const message = `Directory ${index + 1} of ${folders.length} (${folder.name}) was not registered. Extraction has not started.`;
+          const message = `Directory ${index + 1} of ${folders.length} (${folder.name}) did not return a confirmed segment registration. ` +
+            `Extraction has not started; check the Get segments API response and extraction log.`;
           onRegisterError?.(message);
           toastRef.current.error(message);
           return;
@@ -1371,11 +1372,10 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
     if (resolvedPath) {
       setManualPath(resolvedPath);
       toastRef.current.info(`Registering in place from ${resolvedPath} — no copy.`);
-      try {
-        await ingestAtResolvedPath(resolvedPath, true, options);
-      } catch {
-        // ingestAtResolvedPath remounts and retries. Never copy E01s through the browser.
-      }
+      await ingestAtResolvedPath(resolvedPath, true, {
+        ...options,
+        expectedSegmentNames: folder.files.filter((item) => item.isSegment).map((item) => item.name),
+      });
       return;
     }
 
@@ -1390,21 +1390,25 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
       const apiResolved = await forensicApi.resolveHostFolder(jobId, retryPayload);
       if (apiResolved.path && isAbsoluteEvidencePath(apiResolved.path)) {
         setManualPath(apiResolved.path);
-        await ingestAtResolvedPath(apiResolved.path, true, options);
+        await ingestAtResolvedPath(apiResolved.path, true, {
+          ...options,
+          expectedSegmentNames: folder.files.filter((item) => item.isSegment).map((item) => item.name),
+        });
         return;
       }
-    } catch {
-      /* fall through */
+    } catch (e) {
+      // A path-lookup failure can fall through to the host helper. Registration
+      // errors must propagate instead of being replaced with the generic dialog.
+      if (directoryRegisteredRef.current) throw e;
     }
     const retryHost = await resolveFolderOnHost(retryPayload);
     if (retryHost?.path && isAbsoluteEvidencePath(retryHost.path)) {
       setManualPath(retryHost.path);
       toastRef.current.info(`Registering in place from ${retryHost.path} — no copy.`);
-      try {
-        await ingestAtResolvedPath(retryHost.path, true, options);
-      } catch {
-        /* already surfaced */
-      }
+      await ingestAtResolvedPath(retryHost.path, true, {
+        ...options,
+        expectedSegmentNames: folder.files.filter((item) => item.isSegment).map((item) => item.name),
+      });
       return;
     }
 
@@ -1566,7 +1570,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
   async function ingestAtResolvedPath(
     hostPath: string,
     allowMountRetry = true,
-    options?: { deferProcessing?: boolean; displayLabel?: string },
+    options?: { deferProcessing?: boolean; displayLabel?: string; expectedSegmentNames?: string[] },
   ) {
     const normalized = normalizeEvidencePath(hostPath);
     // Client-computer evidence registers by its virtual path; show the examiner
@@ -1724,6 +1728,9 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
       const ingest = await forensicApi.ingestHostPath(jobId, {
         path: normalized,
         source_type: sourceType,
+        // The server must commit every selected E01 before it is allowed to
+        // queue extraction (including single-directory jobs).
+        selected_names: options?.expectedSegmentNames?.length ? options.expectedSegmentNames : undefined,
         auto_process: shouldStartProcessing,
         skip_folder_list: true,
         processing_profile: processingProfileRef.current,
@@ -1734,6 +1741,21 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
         fileName: shown,
         phase: "registering",
       });
+      // A partial registration must never be treated as success merely because
+      // at least one E01 was accepted. Verify the selected directory's filenames,
+      // not the job-wide evidence count (which could belong to Directory 2).
+      const expectedNames = options?.expectedSegmentNames ?? [];
+      if (expectedNames.length) {
+        const accepted = new Set((ingest.accepted ?? []).map((file) => file.original_name?.toLowerCase()));
+        const missing = expectedNames.filter((name) => !accepted.has(name.toLowerCase()));
+        if (missing.length) {
+          throw new Error(
+            `Only ${expectedNames.length - missing.length}/${expectedNames.length} evidence segment(s) registered from ${shown}. ` +
+            `Missing: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` (+${missing.length - 5} more)` : ''}. ` +
+            `Check Extraction Log for the original file or database error; retry keeps successful registrations.`
+          );
+        }
+      }
       if (options?.deferProcessing && ingest.accepted?.length) {
         directoryRegisteredRef.current = true;
         toast.success(
@@ -1776,7 +1798,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
           "List folder succeeded but no segments were registered. The drive may have unmounted. Try again.";
         onRegisterError?.(msg);
         toast.error(msg);
-        return;
+        throw new Error(msg);
       } else {
         toast.success(`${ingest.accepted.length} segment(s) registered in place`);
       }
@@ -1787,11 +1809,9 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : "Host registration failed";
       const mountRelated = isDockerMountError(errMsg);
-      const transient =
-        e instanceof ApiError && (e.code === "timeout" || e.code === "network_error");
       // Remount only for Docker mount gaps — not for missing folders (Path not found),
       // which previously spun Refresh for minutes and then blamed HostDrive.
-      if (allowMountRetry && (mountRelated || transient)) {
+      if (allowMountRetry && mountRelated) {
         const remounted = await refreshDriveMountsOnHost(
           normalized.match(/^([A-Za-z]):/)?.[1]?.toLowerCase(),
           { light: true, requiredPath: normalized }
@@ -1801,7 +1821,41 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
           return;
         }
       }
-      if (e instanceof ApiError && (e.code === "timeout" || e.status === 504 || e.status === 502)) {
+      if (e instanceof ApiError && (e.code === "timeout" || e.code === "network_error" || e.status === 504 || e.status === 502)) {
+        // The POST may have committed in PostgreSQL before the gateway timed
+        // out. Read the selected folder's committed registration only; a
+        // job-wide segment count can conceal a missing directory.
+        try {
+          const status = await forensicApi.getEvidenceRegistrationStatus(jobId, {
+            path: normalized,
+            expected_names: options?.expectedSegmentNames ?? [],
+          });
+          if (status.complete) {
+            directoryRegisteredRef.current = true;
+            toast.success(`Evidence already committed for ${shown} (${status.registered_count} segment(s)).`);
+            onRegistered?.();
+            return;
+          }
+          if (status.registered_count > 0) {
+            const reason = `Registration is incomplete for ${shown}: ${status.registered_count} file(s) committed` +
+              (status.missing_names.length ? `; missing ${status.missing_names.slice(0, 5).join(', ')}.` : '.') +
+              ' Retry registration without deleting this job.';
+            onRegisterError?.(reason);
+            toast.error(reason);
+            throw new Error(reason);
+          }
+        } catch (verificationError) {
+          if (verificationError instanceof Error && verificationError.message.startsWith('Registration is incomplete')) {
+            throw verificationError;
+          }
+          // Preserve the original network error when the status API is also down.
+        }
+        if (options?.deferProcessing) {
+          const reason = `Cannot verify committed registration for ${shown}: ${errMsg}. ` +
+            'Extraction has not started. Check API logs and retry; previous registrations remain intact.';
+          onRegisterError?.(reason);
+          throw new Error(reason);
+        }
         try {
           const job = await forensicApi.getJob(jobId);
           const hasSegments = Boolean(

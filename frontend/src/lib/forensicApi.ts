@@ -623,6 +623,18 @@ export const forensicApi = {
       timeoutMs: 30_000,
     }),
 
+  getEvidenceRegistrationStatus: (
+    jobId: string,
+    payload: { path: string; expected_names?: string[] }
+  ) => api.post<{
+    job_id: string;
+    path: string;
+    complete: boolean;
+    registered_count: number;
+    expected_count: number;
+    missing_names: string[];
+  }>(`/api/jobs/${jobId}/evidence/registration-status`, payload, { timeoutMs: 20_000 }),
+
   ingestHostPath: (
     jobId: string,
     payload: {
