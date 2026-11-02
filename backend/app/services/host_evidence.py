@@ -2655,9 +2655,10 @@ def _log_folder_listing(db: Session, job_id: str, folder: Path) -> dict:
     except Exception:
         pass
 
-    # New segment set: preserve the full list-folder audit before registering.
-    if not skip_folder_list:
-        listing = _log_folder_listing(db, job_id, folder)
+    # List-folder is the leaf operation. Do not call _log_folder_listing here:
+    # skip_folder_list belongs to register_segments(), not this function.
+    # Calling ourselves here previously raised NameError and would recurse
+    # indefinitely if an arbitrary default were added for that variable.
     persist_job_evidence_folder(db, job_id, display_folder)
     preview = [row for row in entries if row.get("kind") == "file" and _segment_info(str(row.get("name") or ""))]
     if len(preview) < 80:
@@ -2675,6 +2676,27 @@ def _log_folder_listing(db: Session, job_id: str, folder: Path) -> dict:
         "segments": segment_names,
         "workers": workers,
     }
+
+
+def _folder_listing_completed_for_path(db: Session, job_id: str, display_path: str) -> bool:
+    """Only reuse a completed listing for the *same* evidence directory.
+
+    A multi-image job may list Case A and Case B separately. The older
+    listing_complete(job_id) flag is job-wide and cannot establish that the
+    newly selected folder has been audited. The metadata path is recorded by
+    _log_folder_listing after the scan completes.
+    """
+    row = fetchone(
+        db,
+        """SELECT 1 AS ok FROM disk_build_logs
+             WHERE job_id=:job_id AND stage='folder_list'
+               AND metadata IS NOT NULL
+               AND metadata->>'complete' = 'true'
+               AND metadata->>'path' = :path
+             LIMIT 1""",
+        {"job_id": job_id, "path": display_path},
+    )
+    return bool(row)
 
 
 def _commit_register_progress(db: Session) -> None:
@@ -3051,6 +3073,12 @@ def register_segments(
             "images": registered_image_roster(db, job_id),
             "already_registered": True,
         }
+    # The examiner may already have completed Step 2 (List folder). Do not
+    # scan a 112-segment directory again just because Get segments is called.
+    # On a new folder, however, retain the full listing audit unless the
+    # caller explicitly requested skip_folder_list (e.g. recovery).
+    if not skip_folder_list and not _folder_listing_completed_for_path(db, job_id, display_folder):
+        _log_folder_listing(db, job_id, folder)
     persist_job_evidence_folder(db, job_id, display_folder)
 
     # Make the source-residency contract explicit. Host/server paths are processed
