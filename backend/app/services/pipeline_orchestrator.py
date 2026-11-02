@@ -842,7 +842,15 @@ def patch_segment_registration_orchestration(
     committed.  ``processed`` includes existing/reused rows and explicit skips so
     the stage always converges.
     """
-    row = fetchone(db, "SELECT pipeline_progress FROM jobs WHERE id=:id", {"id": job_id})
+    row = fetchone(db, "SELECT status, pipeline_progress FROM jobs WHERE id=:id", {"id": job_id})
+    # A delayed registration must not turn a running Virtual disk / Extraction
+    # panel back into Get segments; this also prevents the supervisor from
+    # mistaking an in-flight extraction for an unowned registered job.
+    if str((row or {}).get("status") or "").lower() in {
+        "processing", "building_disk", "extracting", "disk_ready", "indexing",
+        "parsed", "indexed", "ready", "report_ready", "completed",
+    }:
+        return
     pp = _parse_pp(row.get("pipeline_progress") if row else None)
     prev = pp.get("orchestration") if isinstance(pp.get("orchestration"), dict) else {}
     states = prev.get("agents") if isinstance(prev.get("agents"), dict) else _empty_agent_states()

@@ -244,7 +244,17 @@ def build_extracted_image(db: Session, job_id: str, *, schema_name: str) -> dict
     """
     from app.services.job_locks import extract_job_lock, extract_task_in_flight
 
-    if extract_task_in_flight(db, job_id):
+    # A recovery Celery task must not count itself as the previous extract
+    # owner. If a dead worker left a lock behind, self-inspection otherwise
+    # reports "already running" forever although no reader is active.
+    current_task_id = None
+    try:
+        from celery import current_task
+
+        current_task_id = str(current_task.request.id or "") or None
+    except (AttributeError, ImportError):
+        pass
+    if extract_task_in_flight(db, job_id, exclude_task_id=current_task_id):
         write_disk_log(
             db,
             job_id,

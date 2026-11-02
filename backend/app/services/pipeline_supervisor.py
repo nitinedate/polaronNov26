@@ -840,15 +840,51 @@ def dispatch_stage_agent(db, job_id: str, *, schema_name: str, recommendation: d
             except Exception:
                 try: db.rollback()
                 except Exception: pass
+            from app.services.job_locks import extract_is_live
+
+            # Older jobs may be back in `registered` after a late directory
+            # registration even though a real worker still owns the extract.
+            # Heal the status instead of placing a duplicate task on Redis.
+            if extract_is_live(db, job_id, current):
+                execute(db, "UPDATE jobs SET status='processing', updated_at=NOW() WHERE id=:jid AND status='registered'", {"jid": job_id})
+                write_disk_log(db, job_id, "Extraction worker already owns job; restored processing state without duplicate dispatch", stage="supervisor")
+                db.commit()
+                return {"status": "already_running", "agent_id": "extract_agent", "action": action, "job_id": job_id}
+
             queue = extract_queue_for_job(db, job_id)
-            if queue == "disk-build":
-                async_result = build_extracted_disk_task.apply_async(args=(schema_name, job_id), queue=queue)
-            else:
-                async_result = build_extracted_mobile_task.apply_async(args=(schema_name, job_id), queue=queue)
+            # Claim the DB transition atomically BEFORE publishing the task.
+            # Two supervisors previously published overlapping Celery tasks
+            # while the row still said registered (the source of lock contention).
+            claimed = fetchone(
+                db,
+                """UPDATE jobs SET status='processing', error=NULL, updated_at=NOW()
+                   WHERE id=:jid AND status='registered' RETURNING id""",
+                {"jid": job_id},
+            )
+            if not claimed:
+                db.rollback()
+                return {"status": "already_queued", "agent_id": "extract_agent", "action": action, "job_id": job_id}
+            mark_pipeline_agent_running(db, job_id, 'virtual_disk_agent', detail=f"Dispatching to {queue}; waiting for worker ownership", pct=1)
+            db.commit()
+            try:
+                if queue == "disk-build":
+                    async_result = build_extracted_disk_task.apply_async(args=(schema_name, job_id), queue=queue)
+                else:
+                    async_result = build_extracted_mobile_task.apply_async(args=(schema_name, job_id), queue=queue)
+            except Exception as exc:
+                # Restore only the row we claimed, allowing an explicit later
+                # retry. A dispatch exception must not strand the job as busy.
+                execute(
+                    db,
+                    """UPDATE jobs SET status='registered', error=:err, updated_at=NOW()
+                       WHERE id=:jid AND status='processing' AND celery_task_id IS NULL""",
+                    {"jid": job_id, "err": f"Extract dispatch failed: {exc}"[:500]},
+                )
+                write_disk_log(db, job_id, f"Extraction queue unavailable ({queue}): {exc}", stage="supervisor", level="error")
+                db.commit()
+                raise
             set_celery_task_id(db, job_id, async_result.id)
-            execute(db, "UPDATE jobs SET status='processing', error=NULL, updated_at=NOW() WHERE id=:jid", {"jid": job_id})
-            mark_pipeline_agent_running(db, job_id, 'virtual_disk_agent', detail=f"Queued on {queue}; worker claim pending", pct=1)
-            write_disk_log(db, job_id, f"Registered evidence queued for extraction on {queue}", stage="progress", level="info")
+            write_disk_log(db, job_id, f"Registered evidence queued exactly once for extraction on {queue} task={async_result.id}", stage="progress", level="info")
             db.commit()
             return {"status":"queued","agent_id":"virtual_disk_agent","action":action,"queue":queue,"task_id":async_result.id,"job_id":job_id}
     agent_id = resolve_domain_agent_id(db, job_id, raw_agent_id)

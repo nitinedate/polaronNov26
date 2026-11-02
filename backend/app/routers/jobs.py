@@ -2994,6 +2994,23 @@ def resume_job(
     from app.services.job_control import extraction_is_stale, load_extraction_checkpoint
 
     row = _ensure_job(db, job_id)
+    # A previous registration race may have reset a running extraction to
+    # `registered` while its worker still owns the Redis/CPU lease. Restore the
+    # correct state without starting a second task or doing a slow folder walk.
+    if str(row.get("status") or "") == "registered":
+        from app.services.job_locks import extract_is_live
+
+        if extract_is_live(db, job_id, row):
+            from app.services.disk_build_log import write_disk_log
+
+            execute(
+                db,
+                "UPDATE jobs SET status='processing', updated_at=NOW() WHERE id=:id AND status='registered'",
+                {"id": job_id},
+            )
+            write_disk_log(db, job_id, "Recovered active extraction state; existing worker owns this job. No duplicate resume queued.", stage="extract")
+            db.commit()
+            return {"job_id": job_id, "status": "processing", "message": "Extraction worker is already running; waiting for current source progress"}
     stale = extraction_is_stale(row)
     if row["status"] in ("building_disk", "processing") and not stale:
         from app.services.job_control import extract_worker_liveness

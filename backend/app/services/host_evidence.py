@@ -2655,6 +2655,9 @@ def _log_folder_listing(db: Session, job_id: str, folder: Path) -> dict:
     except Exception:
         pass
 
+    # New segment set: preserve the full list-folder audit before registering.
+    if not skip_folder_list:
+        listing = _log_folder_listing(db, job_id, folder)
     persist_job_evidence_folder(db, job_id, display_folder)
     preview = [row for row in entries if row.get("kind") == "file" and _segment_info(str(row.get("name") or ""))]
     if len(preview) < 80:
@@ -2964,11 +2967,10 @@ def register_segments(
     if folder.is_file():
         folder = folder.parent
 
-    # Step before Get segments: print every file in the folder to extraction logs.
+    # Discover segment names cheaply first. An already-registered directory can
+    # then return without repeating the potentially expensive folder-list API
+    # operation (which previously timed out on multi-image resume).
     listing: dict | None = None
-    if not skip_folder_list:
-        listing = _log_folder_listing(db, job_id, folder)
-
     paths = _collect_segment_files(folder, selected_names, source_type)
     if not paths:
         try:
@@ -2979,6 +2981,8 @@ def register_segments(
         except Exception:
             pass
     if not paths:
+        if not skip_folder_list:
+            listing = _log_folder_listing(db, job_id, folder)
         listed = listing or _last_listing_counts(db, job_id)
         try:
             from app.services.client_intake import is_staged_upload_path
@@ -3015,6 +3019,38 @@ def register_segments(
         )
 
     display_folder = _listing_display_path(folder)
+    # The browser and progressAgent may retry registration while an extract is
+    # already queued. Reusing committed evidence must be a read-only, fast path:
+    # a second 112-segment pass used to rewind jobs.status and orchestration,
+    # thereby causing repeated /resume dispatches and client timeouts.
+    existing_rows = fetchall(
+        db,
+        "SELECT * FROM evidence_files WHERE job_id=:job_id AND host_path IS NOT NULL",
+        {"job_id": job_id},
+    )
+    existing_by_path = {
+        str(item.get("host_path") or "").replace("\\", "/").casefold(): item
+        for item in existing_rows
+    }
+    normalized_paths = [str(item.resolve()).replace("\\", "/").casefold() for item in paths]
+    if normalized_paths and all(item in existing_by_path for item in normalized_paths):
+        from app.services.disk import segment_readiness
+        from app.services.mobile_os import load_job_disk_source
+
+        ready = segment_readiness(existing_rows)
+        accepted_rows = [_evidence_row(existing_by_path[item]) for item in normalized_paths]
+        # Do not log a fictitious registration transition or modify the live
+        # extraction's status, disk_source, progress, lock, or checkpoint.
+        log.info("Evidence directory already registered job=%s directory=%s files=%s", job_id, display_folder, len(accepted_rows))
+        return {
+            "accepted": accepted_rows, "skipped": [], "readiness": ready,
+            "message": None,
+            "axiom_platform": load_job_disk_source(
+                fetchone(db, "SELECT disk_source FROM jobs WHERE id=:job_id", {"job_id": job_id}) or {}
+            ).get("axiom_platform"),
+            "images": registered_image_roster(db, job_id),
+            "already_registered": True,
+        }
     persist_job_evidence_folder(db, job_id, display_folder)
 
     # Make the source-residency contract explicit. Host/server paths are processed
@@ -3242,7 +3278,13 @@ def register_segments(
     )
     execute(
         db,
-        "UPDATE jobs SET segment_readiness=CAST(:sr AS jsonb), status='registered', updated_at=NOW() WHERE id=:job_id",
+        """UPDATE jobs SET segment_readiness=CAST(:sr AS jsonb),
+                  status=CASE
+                    WHEN status IN ('created','pending','uploaded','awaiting_segments','registered')
+                      THEN 'registered'
+                    ELSE status
+                  END,
+                  updated_at=NOW() WHERE id=:job_id""",
         {"sr": json.dumps(sr), "job_id": job_id},
     )
     patch_segment_registration_orchestration(

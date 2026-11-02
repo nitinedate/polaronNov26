@@ -85,29 +85,44 @@ def parse_task_in_flight(db, job_id: str, *, idle_sec: float = 180.0) -> bool:
     return job_lock_held("parse", job_id)
 
 
-def extract_celery_work_active(job_id: str, *, timeout: float = 1.5) -> bool | None:
-    """True when a live extract Celery task matches this job. None if inspect failed."""
+def extract_celery_work_active(
+    job_id: str, *, timeout: float = 1.5, exclude_task_id: str | None = None
+) -> bool | None:
+    """True when OTHER active extract tasks own this job; None if inspect failed.
+
+    A restarted task sees itself in Celery.inspect(active). Without exclusion
+    it mistook its own attempt for the stale worker that left the Redis lock,
+    returned already_running and never made extraction progress.
+    """
     try:
         from app.celery_app import celery
 
         inspect = celery.control.inspect(timeout=timeout)
-        active = inspect.active() or {}
-        reserved = inspect.reserved() or {}
+        active = inspect.active()
+        # Reserved jobs are queued, not live owners. Treating them as active
+        # kept stale extract locks alive forever while no worker copied bytes.
+        # No worker response is unknown (not proof that a worker is dead).
+        if not active:
+            return None
     except Exception as exc:
         log.debug("extract celery inspect failed job=%s: %s", job_id, exc)
         return None
     needle = str(job_id)
-    for pool in (active, reserved):
-        for tasks in pool.values():
-            for task in tasks or []:
-                info = task.get("request") if isinstance(task.get("request"), dict) else task
-                name = str(info.get("name") or task.get("name") or task.get("type") or "")
-                blob = " ".join(
-                    str(info.get(key) or task.get(key) or "")
-                    for key in ("args", "kwargs", "id")
-                )
-                if needle in blob and "build_extracted" in name:
-                    return True
+    for tasks in active.values():
+        for task in tasks or []:
+            info = task.get("request") if isinstance(task.get("request"), dict) else task
+            if not isinstance(info, dict):
+                continue
+            name = str(info.get("name") or task.get("name") or task.get("type") or "")
+            task_id = str(info.get("id") or task.get("id") or "")
+            if exclude_task_id and task_id == str(exclude_task_id):
+                continue
+            blob = " ".join(
+                str(info.get(key) or task.get(key) or "")
+                for key in ("args", "kwargs", "id")
+            )
+            if needle in blob and "build_extracted" in name:
+                return True
     return False
 
 
@@ -137,7 +152,9 @@ def _extract_heartbeat_age_sec(db, job_id: str) -> float | None:
     return None
 
 
-def extract_task_in_flight(db, job_id: str, *, idle_sec: float = 180.0) -> bool:
+def extract_task_in_flight(
+    db, job_id: str, *, idle_sec: float = 180.0, exclude_task_id: str | None = None
+) -> bool:
     """True when this job already has a live extract worker.
 
     Duplicate resume tasks remount the E01 and re-walk the filesystem while
@@ -153,7 +170,10 @@ def extract_task_in_flight(db, job_id: str, *, idle_sec: float = 180.0) -> bool:
         pass
     if not job_lock_held("extract", job_id):
         return False
-    celery_active = extract_celery_work_active(job_id)
+    celery_active = (
+        extract_celery_work_active(job_id, exclude_task_id=exclude_task_id)
+        if exclude_task_id else extract_celery_work_active(job_id)
+    )
     if celery_active is True:
         return True
     lock_age = job_lock_age_sec("extract", job_id)
