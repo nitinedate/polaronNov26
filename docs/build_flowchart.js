@@ -1,0 +1,46 @@
+const pptxgen = require('pptxgenjs');
+const { warnIfSlideElementsOutOfBounds } = require('/home/oai/skills/slides/pptxgenjs_helpers');
+const pptx = new pptxgen();
+pptx.layout = 'LAYOUT_WIDE';
+pptx.author = 'Forensic Engineering';
+pptx.subject = 'Multi-directory forensic evidence extraction and combined processing';
+pptx.title = 'Multi-directory evidence workflow';
+pptx.lang = 'en-US';
+const slide = pptx.addSlide();
+slide.background = {color: 'F8FBFD'};
+const C = {dark:'132B43',muted:'50647A',border:'C5D5E2',blue:'E5F0FC',teal:'E2F6F0',amber:'FFF3D6',green:'E6F7EA',arrow:'7491AC'};
+slide.addText('ONE JOB · MULTIPLE E01 IMAGE DIRECTORIES', {x:.55,y:.26,w:12.3,h:.47,margin:0,fontFace:'Aptos Display',fontSize:23,bold:true,color:C.dark});
+slide.addText('Separate acquisition identity • sequential, read-only extraction • one combined downstream artifact index', {x:.56,y:.76,w:12.2,h:.35,fontSize:11.5,color:C.muted,margin:0});
+function card(x,y,num,title,detail,fill){
+  slide.addShape(pptx.ShapeType.roundRect, {x,y,w:3.75,h:1.1,rectRadius:.13,fill:{color:fill},line:{color:C.border,width:1.15},radius:.12});
+  slide.addShape(pptx.ShapeType.ellipse,{x:x+.15,y:y+.16,w:.39,h:.39,fill:{color:C.dark},line:{color:C.dark}});
+  slide.addText(String(num),{x:x+.15,y:y+.20,w:.39,h:.25,align:'center',margin:0,color:'FFFFFF',bold:true,fontSize:11});
+  slide.addText(title,{x:x+.64,y:y+.13,w:2.99,h:.3,margin:0,color:C.dark,bold:true,fontSize:13});
+  slide.addText(detail,{x:x+.64,y:y+.52,w:2.98,h:.44,margin:0,color:C.muted,fontSize:10.3,breakLine:false});
+}
+const X=[.58,4.79,9.00],Y=[1.43,3.38,5.34];
+card(X[0],Y[0],1,'Create one job','Choose 1, 2, 3 or more distinct folders',C.blue);
+card(X[1],Y[0],2,'Register + validate','Source path, E01 sequence and readiness per folder',C.blue);
+card(X[2],Y[0],3,'Check every source','Missing segments? Hold + log; never merge E01 sets',C.amber);
+card(X[2],Y[1],4,'Open one image','E01/E02/... for one directory; log its exact path',C.teal);
+card(X[1],Y[1],5,'Read + extract','Detect source OS; filter; read original file bytes',C.teal);
+card(X[0],Y[1],6,'Save + append','Unique source prefix, MinIO shards, source counts',C.teal);
+card(X[0],Y[2],7,'Finalize combined index','Repeat steps 4–6 for other folders, then close barrier',C.amber);
+card(X[1],Y[2],8,'Run ONE shared pipeline','Materialize • parse • OCR • RAG • graph • validate',C.green);
+card(X[2],Y[2],9,'Examine combined case','Source-aware artifact preview, search and reports',C.green);
+const L=(x1,y1,x2,y2,label)=>{
+ slide.addShape(pptx.ShapeType.line,{x:x1,y:y1,w:x2-x1,h:y2-y1,line:{color:C.arrow,width:2.2,beginArrowType:'none',endArrowType:'triangle'}});
+ if(label) slide.addText(label,{x:(x1+x2)/2-.42,y:(y1+y2)/2-.19,w:.84,h:.27,margin:0,color:C.muted,bold:true,align:'center',fontSize:9});
+};
+L(X[0]+3.75,Y[0]+.55,X[1]-.08,Y[0]+.55);
+L(X[1]+3.75,Y[0]+.55,X[2]-.08,Y[0]+.55);
+L(X[2]+1.86,Y[0]+1.10,X[2]+1.86,Y[1]-.08);
+L(X[2]-.08,Y[1]+.55,X[1]+3.75,Y[1]+.55);
+L(X[1]-.08,Y[1]+.55,X[0]+3.75,Y[1]+.55);
+L(X[0]+1.85,Y[1]+1.10,X[0]+1.85,Y[2]-.08);
+L(X[0]+3.75,Y[2]+.55,X[1]-.08,Y[2]+.55);
+L(X[1]+3.75,Y[2]+.55,X[2]-.08,Y[2]+.55);
+slide.addText('Directory loop: each source is independently read and committed. Only after all sources are saved may downstream stages begin.',{x:.60,y:6.79,w:12.06,h:.35,align:'center',fontSize:10.2,bold:true,color:'47647C',margin:0});
+slide.addText('Same filename / hash in a different folder ≠ duplicate source   ·   Single folder follows the original single-image path',{x:.56,y:7.17,w:12.2,h:.19,align:'center',margin:0,color:C.muted,fontSize:8.3});
+warnIfSlideElementsOutOfBounds(slide,pptx);
+pptx.writeFile({fileName:'/mnt/data/forensic_multi_directory_flow.pptx'});

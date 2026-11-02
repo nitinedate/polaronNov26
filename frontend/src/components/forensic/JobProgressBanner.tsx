@@ -94,7 +94,7 @@ export function JobProgressBanner({
                   <li key={`${directory.index}-${directory.label}`} className="text-xs text-ink-800">
                     <span className="font-semibold tabular-nums">{quantity}</span>
                     {" · "}
-                    {directory.label}
+                    <span title={directory.source_directory || directory.namespace || directory.label}>{directory.source_directory || directory.label}</span>
                     {" · "}
                     {directory.step || (directory.state === "saved" ? "Saved" : directory.state === "extracting" ? "Extracting" : "Waiting")}
                   </li>

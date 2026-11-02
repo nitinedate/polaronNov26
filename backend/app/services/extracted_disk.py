@@ -1792,6 +1792,14 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
             interval_sec=15.0,
         ):
             nodes, filter_stats = _filter_nodes(all_nodes, settings, os_info=os_info, mode_override=mode)
+            # Namespace after OS detection/filtering: their rules evaluate native
+            # paths such as Windows/System32, not prefixed artifact paths.
+            namespace = str(getattr(vd, "evidence_namespace", "") or "")
+            if namespace:
+                for node in nodes:
+                    native_path = str(node.get("path") or "").replace("\\", "/").lstrip("/")
+                    node["source_path"] = native_path
+                    node["path"] = f"{namespace}/{native_path}" if native_path else namespace
             if any(enum_coverage.values()):
                 # Preserve the limitation in the extract manifest/checkpoint;
                 # do not silently equate processed=100% with full coverage.

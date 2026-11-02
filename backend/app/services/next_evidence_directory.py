@@ -24,7 +24,10 @@ def directory_key(path: str) -> str:
     return str(path or "").replace("\\", "/").rstrip("/").lower()
 
 
-def pending_directories(files: list[dict], segment_paths: list[str] | None) -> list[dict]:
+def pending_directories(
+    files: list[dict], segment_paths: list[str] | None,
+    directories: list[str] | None = None,
+) -> list[dict]:
     """Directories registered on the job whose segments were not in the saved extract.
 
     An empty segment list means no extract has been published yet. Those
@@ -35,22 +38,24 @@ def pending_directories(files: list[dict], segment_paths: list[str] | None) -> l
     saved = [str(path) for path in (segment_paths or []) if str(path or "").strip()]
     if not saved:
         return []
-    saved_dirs = {directory_key(str(Path(path).parent)) for path in saved}
+    saved_dirs = {directory_key(path.replace("\\", "/").rsplit("/", 1)[0]) for path in saved}
     return [
         group
-        for group in list_image_directories(files)
+        for group in list_image_directories(files, preferred_directories=directories)
         if directory_key(group["directory"]) not in saved_dirs
     ]
 
 
-def restrict_to_next_directory(files: list[dict]) -> tuple[list[dict], str | None]:
+def restrict_to_next_directory(
+    files: list[dict], *, directories: list[str] | None = None,
+) -> tuple[list[dict], str | None]:
     """Keep only the first image directory when several were registered.
 
     The following directories are extracted after this one is saved.
     """
     from app.services.virtual_disk import _evidence_host_path, list_image_directories
 
-    groups = list_image_directories(files)
+    groups = list_image_directories(files, preferred_directories=directories)
     if len(groups) <= 1:
         return files, None
     target = groups[0]
@@ -112,10 +117,13 @@ def directory_roster(db, job_id: str, row: dict | None = None) -> list[dict]:
     )
     from app.services.virtual_disk import list_image_directories
 
-    registered = list_image_directories(files)
+    registered = list_image_directories(files, preferred_directories=list(manifest.get("evidence_folders") or []))
     if len(registered) <= 1:
         return []
-    pending = pending_directories(files, list(manifest.get("segment_paths") or []))
+    pending = pending_directories(
+        files, list(manifest.get("segment_paths") or []),
+        directories=list(manifest.get("evidence_folders") or []),
+    )
     pending_keys = {directory_key(item["directory"]) for item in pending}
     append = manifest.get("directory_append") if isinstance(manifest.get("directory_append"), dict) else None
     extracting = bool(append and append.get("owner"))
@@ -157,7 +165,13 @@ def directory_roster(db, job_id: str, row: dict | None = None) -> list[dict]:
             else:
                 detail = "This image is opening now."
             active_label = str(activity.get("directory_label") or "")
-            if active_label and active_label == str(group.get("label") or ""):
+            active_namespace = str(activity.get("directory_namespace") or "")
+            matches_active_directory = (
+                active_namespace == str(group.get("namespace") or "")
+                if active_namespace
+                else active_label == str(group.get("label") or "")
+            )
+            if matches_active_directory:
                 prior = int(manifest.get("files_extracted") or 0)
                 packed = activity.get("files_packed", activity.get("files_extracted"))
                 try:
@@ -178,6 +192,8 @@ def directory_roster(db, job_id: str, row: dict | None = None) -> list[dict]:
             "index": index,
             "total": len(registered),
             "label": group["label"],
+            "source_directory": group["directory"],
+            "namespace": group["namespace"],
             "segments": len(group["paths"]),
             "state": state,
             "detail": detail,
@@ -233,10 +249,15 @@ def unfinished_directory_reason(db, job_id: str, row: dict | None = None) -> str
     folders = manifest.get("evidence_folders") if isinstance(manifest.get("evidence_folders"), list) else []
     from app.services.virtual_disk import list_image_directories
 
-    registered = list_image_directories(files)
+    registered = list_image_directories(files, preferred_directories=list(manifest.get("evidence_folders") or []))
     if len(folders) > len(registered):
         return "Waiting for every evidence directory to finish registering"
-    pending = pending_directories(files, list(manifest.get("segment_paths") or []))
+    pending = pending_directories(
+        files, list(manifest.get("segment_paths") or []),
+        directories=list(manifest.get("evidence_folders") or []),
+    )
+    if not pending and manifest.get("directory_materialize_pending"):
+        return "Directory artifact registration starts after the combined extract is saved"
     if not pending:
         return None
     nxt = pending[0]
@@ -358,19 +379,42 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
             )
             from app.services.virtual_disk import list_image_directories
 
-            registered = list_image_directories(files)
-            pending = pending_directories(files, list(manifest.get("segment_paths") or []))
+            registered = list_image_directories(files, preferred_directories=list(manifest.get("evidence_folders") or []))
+            pending = pending_directories(
+                files,
+                list(manifest.get("segment_paths") or []),
+                directories=list(manifest.get("evidence_folders") or []),
+            )
             if not pending:
                 break
             group = pending[0]
             position = len(registered) - len(pending) + 1
+            from app.services.disk import segment_readiness
+            selected_paths = {str(path).casefold() for path in group["paths"]}
+            group_files = [
+                item for item in files
+                if str(item.get("host_path") or "").casefold() in selected_paths
+            ]
+            readiness = segment_readiness(group_files)
+            if not readiness["ready"]:
+                reason = (
+                    f"Directory {position} of {len(registered)} ({group['directory']}) is not ready: "
+                    f"{readiness.get('message') or 'missing image segments'}"
+                )
+                write_disk_log(db, job_id, reason, stage="extract", level="warning",
+                               metadata={"directory": group["directory"], "readiness": readiness})
+                db.commit()
+                return {"status": "waiting", "reason": reason}
             write_disk_log(
                 db,
                 job_id,
                 f"Directory {position} of {len(registered)}: previous extraction is saved. "
-                f"Opening only {group['label']} ({len(group['paths'])} segment file(s)).",
+                f"Switching to source directory: {group['directory']} "
+                f"({len(group['paths'])} segment file(s), namespace={group['namespace']}).",
                 stage="extract",
-                metadata={"directory": group["directory"], "segments": len(group["paths"])},
+                metadata={"directory": group["directory"], "namespace": group["namespace"],
+                          "directory_index": position, "directories": len(registered),
+                          "segments": len(group["paths"])},
             )
             db.commit()
             manifest = _extract_one_directory(
@@ -383,6 +427,17 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
                 total=len(registered),
             )
             extracted.append(group["label"])
+            write_disk_log(
+                db, job_id,
+                f"Directory {position} of {len(registered)} saved: {group['directory']}. "
+                f"Combined index now contains {int(manifest.get('files_extracted') or 0):,} files "
+                f"({int(manifest.get('bytes_extracted') or 0):,} bytes).",
+                stage="extract",
+                metadata={"directory": group["directory"], "namespace": group["namespace"],
+                          "directory_index": position, "directories": len(registered),
+                          "files_combined": int(manifest.get("files_extracted") or 0)},
+            )
+            db.commit()
             if position == len(registered):
                 write_disk_log(
                     db,
@@ -408,9 +463,32 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
         )
         db.commit()
         try:
+            if not extracted:
+                latest = fetchone(db, "SELECT * FROM jobs WHERE id=:id", {"id": job_id}) or {}
+                source = _manifest_from_row(latest)
+                if source.get("directory_materialize_pending"):
+                    extracted = [
+                        str(item.get("label") or item.get("directory") or "source")
+                        for item in (source.get("directory_stats") or [])
+                        if isinstance(item, dict)
+                    ]
             _register_appended_files(db, job_id, extracted)
         except Exception:
             log.exception("appended directory files were not registered job=%s", job_id)
+            raise  # Never run OCR/RAG on only part of the intended source set.
+        from app.db.sql_helpers import execute
+        execute(
+            db,
+            "UPDATE jobs SET progress_pct=100, updated_at=NOW() WHERE id=:jid",
+            {"jid": job_id},
+        )
+        write_disk_log(
+            db, job_id,
+            "All evidence directories saved and registered. Starting shared parse, OCR, "
+            "artifact inventory, RAG, graph, and validation on the combined index.",
+            stage="extract", metadata={"appended_directories": extracted},
+        )
+        db.commit()
         return {"status": "extracted", "directories": extracted}
     except Exception as exc:
         from app.services.job_control import JobStopRequested
@@ -480,6 +558,13 @@ def _register_appended_files(db, job_id: str, extracted: list[str]) -> None:
             WHERE id=:jid AND status IN ('ready','report_ready','parsed','indexed')""",
         {"jid": job_id},
     )
+    execute(
+        db,
+        """UPDATE jobs SET disk_source = COALESCE(disk_source, '{}'::jsonb)
+                   - 'directory_materialize_pending', updated_at=NOW()
+            WHERE id=:jid""",
+        {"jid": job_id},
+    )
     db.commit()
 
 
@@ -511,7 +596,6 @@ def _extract_one_directory(
 
     settings = get_settings()
     mode = str(manifest.get("extract_mode") or settings.extract_mode or "forensic").strip().lower()
-    saved_os = manifest.get("detected_os") if isinstance(manifest.get("detected_os"), dict) else None
     prior_files = int(manifest.get("files_extracted") or 0)
     prior_bytes = int(manifest.get("bytes_extracted") or 0)
     prior_skipped = int(manifest.get("files_skipped") or 0)
@@ -536,12 +620,21 @@ def _extract_one_directory(
             on_progress=lambda message, metadata=None: None,
             schema_name=schema_name,
         )
-        os_info = saved_os or detect_os_from_paths(enumerated)
+        if not enumerated:
+            raise RuntimeError(
+                f"Directory {position} of {total} ({group['directory']}) mounted but returned "
+                "no filesystem entries. Evidence was not marked processed."
+            )
+        # Separate images may belong to different operating systems. Determine
+        # filtering rules from this source, not the first source's OS.
+        os_info = detect_os_from_paths(enumerated)
         nodes, filter_stats = _filter_nodes(enumerated, settings, os_info=os_info, mode_override=mode)
         label = str(group["label"])
+        namespace = str(group["namespace"])
         for node in nodes:
             rel = str(node.get("path") or "").replace("\\", "/").lstrip("/")
-            node["path"] = f"{label}/{rel}" if rel else label
+            node["source_path"] = rel
+            node["path"] = f"{namespace}/{rel}" if rel else namespace
         write_disk_log(
             db,
             job_id,
@@ -604,6 +697,8 @@ def _extract_one_directory(
                     "directory_index": position,
                     "directories": total,
                     "directory_label": label,
+                    "directory_namespace": namespace,
+                    "source_directory": group["directory"],
                 },
             },
             writer="extract",
@@ -736,7 +831,14 @@ def _publish_directory(
 
         compressor = zstd.ZstdCompressor(level=1)
     index_lines = "\n".join(json.dumps(entry, separators=(",", ":")) for entry in combined).encode("utf-8")
-    index_key = f"{disk_prefix(job_id)}/index.jsonl.zst"
+    # Never overwrite an index that the last COMMITTED manifest points to.
+    # A crash between object upload and PostgreSQL commit can otherwise change
+    # the evidence contents of a previously published snapshot.
+    generation = len(published.get("extracted_directories") or []) + 1
+    index_key = (
+        f"{disk_prefix(job_id)}/indexes/combined-{generation:03d}-"
+        f"{group['namespace']}.jsonl.zst"
+    )
     index_uri = put_bytes(index_key, compressor.compress(index_lines), content_type="application/zstd")
 
     merged_parts = {str(key): value for key, value in (published.get("parts_map") or {}).items() if value}
@@ -755,9 +857,11 @@ def _publish_directory(
         {
             "directory": group["directory"],
             "label": group.get("label") or "",
+            "namespace": group.get("namespace") or "",
             "files": int(files_added),
             "bytes": int(bytes_added),
             "skipped": int(skipped_added),
+            "detected_os": filter_stats.get("detected_os") or {"family": "unknown"},
         }
     )
     published.update(
@@ -773,10 +877,16 @@ def _publish_directory(
             "index_uri": index_uri,
             "extracted_directories": list(published.get("extracted_directories") or []) + [group["directory"]],
             "directory_stats": directory_stats,
+            "directory_materialize_pending": True,
             "filter_stats": {**(published.get("filter_stats") or {}), "next_directory": filter_stats},
         }
     )
-    manifest_key = f"{disk_prefix(job_id)}/manifest.json"
+    # Publish immutable snapshots. A failed DB update must not retroactively
+    # change the data visible through the previously committed manifest URI.
+    manifest_key = (
+        f"{disk_prefix(job_id)}/manifests/combined-{generation:03d}-"
+        f"{group['namespace']}.json"
+    )
     manifest_uri = put_bytes(manifest_key, json.dumps(published, indent=2).encode(), "application/json")
     execute(
         db,

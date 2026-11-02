@@ -112,6 +112,7 @@ export function SerialPipelineBanner({ pipeline, paused, compact, elapsed }: {
               <span className="min-w-0">
                 <span className="font-semibold tabular-nums text-ink-900">{formatQuantity(directory)}</span>
                 <span className="mt-0.5 block text-ink-800">{directory.index}. {directory.label}</span>
+                {directory.source_directory ? <span className="mt-0.5 block break-all text-ink-600" title={directory.namespace}>{directory.source_directory}</span> : null}
                 <span className="mt-0.5 block text-ink-600">{directory.detail} · {Number(directory.segments || 0).toLocaleString()} segment file(s)</span>
               </span>
               <span className={`shrink-0 max-w-[14rem] text-right font-semibold ${directory.state === "saved" ? "text-emerald-700" : directory.state === "extracting" ? "text-amber-700" : "text-ink-500"}`}>

@@ -429,6 +429,7 @@ def shard_worker_v45(
                     stopped = True
                     break
                 rel = node["path"]
+                read_rel = str(node.get("source_path") or rel)
                 inode = node.get("inode")
                 size_hint = int(node.get("size_bytes") or 0)
                 progress.set_current(rel, action="reading", shard_id=shard_id)
@@ -469,7 +470,7 @@ def shard_worker_v45(
                         info.size = size_hint
                         info.mtime = int(node.get("mtime") or 0) or int(time.time())
                         reader = _VerifiedTarReader(
-                            iter_file_from_disk(vd, rel, inode=int(inode), chunk_size=chunk),
+                            iter_file_from_disk(vd, read_rel, inode=int(inode), chunk_size=chunk),
                             hash_files=hash_files,
                         )
                         started = time.monotonic()
@@ -487,7 +488,7 @@ def shard_worker_v45(
                         with gate:   # bounded concurrent image reads
                             spool, nbytes, digest = _stream_into_spool(
                                 iter_file_from_disk(
-                                    vd, rel, inode=int(inode) if inode is not None else None, chunk_size=chunk
+                                    vd, read_rel, inode=int(inode) if inode is not None else None, chunk_size=chunk
                                 ),
                                 hash_files=hash_files,
                                 spool_dir=spool_dir,

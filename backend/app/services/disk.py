@@ -56,22 +56,31 @@ def is_mobile_format(fmt: str) -> bool:
 
 
 def segment_readiness(files: list[dict]) -> dict:
-    sets: dict[str, dict] = {}
+    sets: dict[tuple[str, str], dict] = {}
     for f in files:
         name = f.get("original_name") or ""
+        # E01/E02 from different folders are distinct forensic images even if
+        # their filenames (or hashes) are identical. Keep their readiness separate.
+        parent = _evidence_parent(f)
+        directory = parent.replace("\\", "/").rstrip("/").casefold()
         if f.get("status") not in (None, "registered", "assembled", "received"):
             continue
         sk = segment_key(name)
         if sk:
             key, part, fmt = sk
-            if key not in sets:
-                sets[key] = {"base_name": key.rsplit(".", 1)[0], "format": fmt, "present": set(), "parts": []}
-            sets[key]["present"].add(part)
-            sets[key]["parts"].append(part)
+            source_key = (directory, key.casefold())
+            if source_key not in sets:
+                sets[source_key] = {
+                    "base_name": key.rsplit(".", 1)[0], "format": fmt,
+                    "source_directory": parent, "present": set(), "parts": [],
+                }
+            sets[source_key]["present"].add(part)
+            sets[source_key]["parts"].append(part)
         else:
             key = name or str(f.get("host_path") or f.get("id") or "source")
-            sets[key] = {
+            sets[(directory, key.casefold())] = {
                 "base_name": name or "backup",
+                "source_directory": parent,
                 "format": Path(name).suffix.lstrip(".") or "backup",
                 "present": {1},
                 "parts": [1],
@@ -85,6 +94,7 @@ def segment_readiness(files: list[dict]) -> dict:
         if s.get("single"):
             disk_sets.append({
                 "base_name": s["base_name"],
+                "source_directory": s.get("source_directory") or "",
                 "format": s["format"],
                 "present_segments": present,
                 "missing_segments": [],
@@ -103,6 +113,7 @@ def segment_readiness(files: list[dict]) -> dict:
         label = f"{min(present) if present else 0}-{max(present) if present else 0}"
         entry = {
             "base_name": s["base_name"],
+            "source_directory": s.get("source_directory") or "",
             "format": s["format"],
             "present_segments": present,
             "missing_segments": missing,
@@ -132,7 +143,7 @@ def _evidence_parent(row: dict) -> str:
             host = uri[7:]
     if not host:
         return ""
-    return str(Path(host).parent)
+    return host.replace("\\", "/").rsplit("/", 1)[0] if "/" in host.replace("\\", "/") else ""
 
 
 def _path_is_under(parent: str, folder: str) -> bool:
@@ -448,9 +459,18 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
                 from app.services.next_evidence_directory import restrict_to_next_directory
                 from app.services.virtual_disk import _evidence_host_path, open_virtual_disk_from_paths
 
-                files, directory_note = restrict_to_next_directory(files)
+                from app.services.mobile_os import load_job_disk_source
+                initial_source = load_job_disk_source(
+                    fetchone(db, "SELECT disk_source FROM jobs WHERE id=:job_id", {"job_id": job_id}) or {}
+                )
+                source_folders = list(initial_source.get("evidence_folders") or [])
+                files, directory_note = restrict_to_next_directory(files, directories=source_folders)
                 if directory_note:
-                    write_disk_log(db, job_id, directory_note, stage="virtual_disk")
+                    first_source = str(Path(files[0]["host_path"]).parent) if files else ""
+                    write_disk_log(
+                        db, job_id, directory_note + f" Source: {first_source}",
+                        stage="virtual_disk", metadata={"source_directory": first_source},
+                    )
                     db.commit()
                     paths = []
                     hashes = []
@@ -467,6 +487,15 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
                         base_name=label,
                         combine_image_sets=False,
                     )
+                    # Keep source-relative read paths but namespace stored artifacts.
+                    from app.services.virtual_disk import list_image_directories
+                    groups = list_image_directories(
+                        fetchall(db, "SELECT * FROM evidence_files WHERE job_id=:job_id", {"job_id": job_id}),
+                        preferred_directories=source_folders,
+                    )
+                    if len(groups) > 1:
+                        vd.evidence_namespace = groups[0]["namespace"]
+                        vd.evidence_directory = groups[0]["directory"]
                     if vd._fs_info is None or vd.mode not in {"ewf", "raw"}:
                         vd.close()
                         raise ValueError(
@@ -504,8 +533,11 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
             prior = load_job_disk_source(
                 fetchone(db, "SELECT disk_source FROM jobs WHERE id=:job_id", {"job_id": job_id})
             )
+            # Never overwrite registered evidence_folders with a mount-only dict.
+            # The next-directory barrier reads that roster from disk_source.
             mount_ds = merge_mobile_meta_into_disk_source(
                 {
+                    **prior,
                     "mounted": True,
                     "base_name": vd.base_name,
                     "format": vd.format,
@@ -638,6 +670,30 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
             manifest = merge_mobile_meta_into_disk_source(manifest, extract_mobile_meta(prior))
             if prior.get("processing_profile") in ("standard", "deep"):
                 manifest["processing_profile"] = prior["processing_profile"]
+            if prior.get("evidence_folders"):
+                manifest["evidence_folders"] = list(prior["evidence_folders"])
+            if directory_note:
+                from app.services.virtual_disk import list_image_directories
+                first = list_image_directories(files)
+                if first:
+                    manifest["extracted_directories"] = [first[0]["directory"]]
+                    manifest["directory_stats"] = [{
+                        "directory": first[0]["directory"],
+                        "label": first[0]["label"],
+                        "namespace": first[0]["namespace"],
+                        "files": int(result.get("files_extracted") or 0),
+                        "bytes": int(result.get("bytes_extracted") or 0),
+                        "skipped": int(manifest.get("files_skipped") or 0),
+                        "detected_os": manifest.get("detected_os") or {"family": "unknown"},
+                    }]
+                    # The on-disk manifest must match the database checkpoint.
+                    from app.services.storage import put_bytes
+                    from app.services.disk_manifest import disk_prefix
+                    result["extracted_disk_uri"] = put_bytes(
+                        f"{disk_prefix(job_id)}/manifest.json",
+                        json.dumps(manifest, indent=2).encode("utf-8"),
+                        "application/json",
+                    )
             if (
                 not bool(getattr(settings, "extract_then_process", True)) and not serial_enabled()
                 and settings.phase3_stream_during_extract
@@ -660,13 +716,14 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
                 )
             execute(
                 db,
-                """UPDATE jobs SET segment_readiness=CAST(:sr AS jsonb), status='disk_ready', progress_pct=100,
+                """UPDATE jobs SET segment_readiness=CAST(:sr AS jsonb), status='disk_ready', progress_pct=:pct,
                    extracted_disk_uri=:uri, disk_source=CAST(:ds AS jsonb),
                    files_total=:total, files_extracted=:extracted, bytes_extracted=:bytes,
                    extraction_checkpoint=NULL, celery_task_id=NULL, stop_requested=FALSE,
                    error=NULL, updated_at=NOW() WHERE id=:job_id""",
                 {
                     "sr": json.dumps(readiness),
+                    "pct": 99 if directory_note else 100,
                     "uri": result.get("extracted_disk_uri"),
                     "ds": json.dumps(manifest),
                     "total": result.get("files_total", 0),
@@ -678,8 +735,9 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
             write_disk_log(
                 db,
                 job_id,
-                f"Extracted disk ready — {result.get('files_extracted', 0):,} files "
-                f"({result.get('bytes_extracted', 0):,} bytes) in MinIO",
+                f"Directory 1 extraction saved — {result.get('files_extracted', 0):,} files "
+                f"({result.get('bytes_extracted', 0):,} bytes) in MinIO; "
+                + ("waiting for remaining source directories" if directory_note else "one-directory extraction complete"),
                 stage="extract",
                 metadata=result,
             )

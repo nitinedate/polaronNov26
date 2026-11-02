@@ -3200,9 +3200,10 @@ def register_segments(
                 write_disk_log(
                     db,
                     job_id,
-                    f"Registered {fp.name} ({idx}/{total})",
+                    f"Registered {fp.name} ({idx}/{total}) from {display_folder}",
                     stage="evidence_register",
-                    metadata={"size_bytes": size, "progress_pct": round(idx * 100 / total)},
+                    metadata={"source_directory": display_folder, "size_bytes": size,
+                              "progress_pct": round(idx * 100 / total)},
                 )
             patch_segment_registration_orchestration(
                 db, job_id, processed=idx, total=total, current_name=fp.name, skipped=skipped
@@ -3229,7 +3230,7 @@ def register_segments(
             "be committed. If you attached a new drive, wait for it to remount, then Try again."
         )
 
-    ev = fetchall(db, "SELECT original_name, status FROM evidence_files WHERE job_id=:job_id", {"job_id": job_id})
+    ev = fetchall(db, "SELECT original_name, host_path, storage_uri, status FROM evidence_files WHERE job_id=:job_id", {"job_id": job_id})
     sr = segment_readiness(ev)
     write_disk_log(
         db,

@@ -80,6 +80,9 @@ export interface PipelineProgress {
       index: number;
       total: number;
       label: string;
+      /** Original acquisition folder, distinguishing identical folder basenames. */
+      source_directory?: string;
+      namespace?: string;
       segments: number;
       state: "saved" | "extracting" | "waiting" | string;
       detail: string;

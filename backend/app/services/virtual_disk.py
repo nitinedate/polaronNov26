@@ -796,7 +796,19 @@ def _evidence_host_path(row: dict) -> str:
     return ""
 
 
-def list_image_directories(files: list[dict]) -> list[dict]:
+def directory_namespace(directory: str) -> str:
+    """Stable, collision-resistant artifact prefix for one evidence source."""
+    import hashlib
+
+    canonical = str(directory or "").replace("\\", "/").rstrip("/").casefold()
+    basename = canonical.rsplit("/", 1)[-1] or "image"
+    safe = re.sub(r"[^a-z0-9._-]+", "-", basename).strip(".-_")[:48] or "image"
+    return f"{safe}--{hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:12]}"
+
+
+def list_image_directories(
+    files: list[dict], *, preferred_directories: list[str] | None = None,
+) -> list[dict]:
     """Image segments grouped by parent directory, in first-seen order.
 
     A single directory is included. Callers that must keep the one-image
@@ -812,17 +824,25 @@ def list_image_directories(files: list[dict]) -> list[dict]:
         if not _IMAGE_SEGMENT_RE.search(path.name):
             continue
         parent = str(path.parent)
-        key = parent.lower()
+        key = parent.replace("\\", "/").rstrip("/").casefold()
         if key not in groups:
             groups[key] = {
                 "directory": parent,
                 "label": path.parent.name or _image_group_label(path),
+                "namespace": directory_namespace(parent),
                 "paths": [],
                 "hashes": [],
             }
             order.append(key)
         groups[key]["paths"].append(host)
         groups[key]["hashes"].append(str(row.get("sha256") or ""))
+    if preferred_directories:
+        priorities = {
+            str(folder).replace("\\", "/").rstrip("/").casefold(): index
+            for index, folder in enumerate(preferred_directories)
+        }
+        first_seen = {key: index for index, key in enumerate(order)}
+        order.sort(key=lambda key: priorities.get(key, len(priorities) + first_seen[key]))
     return [groups[key] for key in order]
 
 

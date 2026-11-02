@@ -395,6 +395,9 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
   const registerPickedFolderRef = useRef<
     (folder: StagedEvidenceFolder, options?: { deferProcessing?: boolean }) => Promise<void>
   >(async () => undefined);
+  // The chooser must not launch a combined job when one selected folder failed
+  // registration. The existing ingest flow reports errors without throwing.
+  const directoryRegisteredRef = useRef(false);
   const browserRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
@@ -1209,7 +1212,21 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
             `Directory ${index + 1} of ${folders.length}: ${folder.name}. Only this directory is registered now.`
           );
         }
-        await registerPickedFolderRef.current(folder, { deferProcessing: multiple });
+        directoryRegisteredRef.current = false;
+        try {
+          await registerPickedFolderRef.current(folder, { deferProcessing: multiple });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Evidence folder could not be registered";
+          onRegisterError?.(message);
+          toastRef.current.error(message);
+          return;
+        }
+        if (multiple && !directoryRegisteredRef.current) {
+          const message = `Directory ${index + 1} of ${folders.length} (${folder.name}) was not registered. Extraction has not started.`;
+          onRegisterError?.(message);
+          toastRef.current.error(message);
+          return;
+        }
       }
       if (multiple && autoProcess) {
         toastRef.current.info(
@@ -1219,7 +1236,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
         onProcessingStarted?.();
       }
     },
-    [autoProcess, jobId, onProcessingStarted]
+    [autoProcess, jobId, onProcessingStarted, onRegisterError]
   );
 
 
@@ -1474,10 +1491,14 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
             : `Forensic server connected to ${source.display_path} (${source.file_count.toLocaleString()} file(s)). Nothing is copied.`
         );
         setManualPath(source.path);
+        directoryRegisteredRef.current = false;
         await ingestAtResolvedPath(source.path, false, {
           deferProcessing: multiple,
           displayLabel: source.display_path,
         });
+        if (multiple && !directoryRegisteredRef.current) {
+          throw new Error(`The segments from ${source.display_path} did not register. The combined job was not started.`);
+        }
       } catch (e: unknown) {
         if (!connected) {
           // The server never accepted this share: withdraw it on the agent too.
@@ -1714,6 +1735,7 @@ export const HostEvidencePanel = forwardRef<HostEvidencePanelHandle, HostEvidenc
         phase: "registering",
       });
       if (options?.deferProcessing && ingest.accepted?.length) {
+        directoryRegisteredRef.current = true;
         toast.success(
           `Registered ${ingest.accepted.length} segment(s) from this directory. The next directory is extracted after this one.`
         );
