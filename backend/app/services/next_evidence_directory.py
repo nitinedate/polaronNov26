@@ -603,6 +603,33 @@ def _register_appended_files(db, job_id: str, extracted: list[str]) -> None:
     db.commit()
 
 
+def combine_saved_directory_counts(activity: dict | None, *, saved_files: int) -> dict | None:
+    """Add a saved image back onto a follow-up image that started its counter at zero.
+
+    The second image's packer publishes only its own files. The card then shows
+    a few thousand of the old total and looks stuck, while the first image's
+    files are still saved.
+    """
+    if not isinstance(activity, dict) or not activity.get("next_directory"):
+        return None
+    saved = int(saved_files or 0)
+    if saved <= 0:
+        return None
+    packed = int(activity.get("files_packed") or activity.get("files_extracted") or 0)
+    uploaded = int(activity.get("files_uploaded") or 0)
+    if packed >= saved or uploaded >= saved:
+        return None
+    live_total = int(activity.get("files_total") or 0)
+    shown = saved + max(packed, uploaded)
+    combined = dict(activity)
+    combined["files_uploaded"] = shown
+    combined["files_packed"] = shown
+    combined["files_extracted"] = shown
+    if live_total:
+        combined["files_total"] = saved + live_total
+    return combined
+
+
 def _extract_one_directory(
     db,
     job_id: str,
@@ -634,6 +661,12 @@ def _extract_one_directory(
     prior_files = int(manifest.get("files_extracted") or 0)
     prior_bytes = int(manifest.get("bytes_extracted") or 0)
     prior_skipped = int(manifest.get("files_skipped") or 0)
+    if prior_files <= 0:
+        from app.services.job_control import load_extraction_checkpoint
+
+        saved = load_extraction_checkpoint(db, job_id) or {}
+        prior_files = int(saved.get("files_extracted") or 0)
+        prior_bytes = int(saved.get("bytes_extracted") or prior_bytes)
 
     one = None
     try:

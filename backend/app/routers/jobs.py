@@ -480,6 +480,35 @@ def _heal_stuck_drive_mount(db: Session, job_id: str, row: dict, schema: str) ->
         return None
 
 
+def _present_followup_extract(out: dict) -> dict:
+    """Show the saved image plus the image that is copying now.
+
+    The follow-up packer counts only its own files. Leaving that raw count on
+    the card made 463,139 saved files look like they had fallen back to 1,521.
+    """
+    pp = out.get("pipeline_progress")
+    ds = out.get("disk_source") if isinstance(out.get("disk_source"), dict) else {}
+    if not isinstance(pp, dict):
+        return out
+    from app.services.next_evidence_directory import combine_saved_directory_counts
+
+    combined = combine_saved_directory_counts(
+        pp.get("extraction_activity") if isinstance(pp.get("extraction_activity"), dict) else None,
+        saved_files=int(ds.get("files_extracted") or 0),
+    )
+    if not combined:
+        return out
+    pp = dict(pp)
+    pp["extraction_activity"] = combined
+    pp["completed"] = combined["files_extracted"]
+    if combined.get("files_total"):
+        pp["total"] = combined["files_total"]
+        out["files_total"] = combined["files_total"]
+    out["pipeline_progress"] = pp
+    out["files_extracted"] = combined["files_extracted"]
+    return out
+
+
 def _job_row(row: dict, *, enrichment: dict | None = None) -> dict:
     sr = row.get("segment_readiness")
     if isinstance(sr, str):
@@ -542,7 +571,7 @@ def _job_row(row: dict, *, enrichment: dict | None = None) -> dict:
                 "next_batch_size": 0,
                 "batch_cap": 0,
             }
-    return out
+    return _present_followup_extract(out)
 
 
 def _schema_name(db: Session, current: CurrentUser) -> str:
