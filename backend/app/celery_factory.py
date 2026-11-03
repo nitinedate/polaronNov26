@@ -24,6 +24,7 @@ FORENSIC_ROUTES = {
     "app.tasks.forensic_failure_email_task": {"queue": "disk-progress"},
     "app.tasks.forensic_serial_stage_task": {"queue": "disk-parse"},
     "app.tasks.build_extracted_disk_task": {"queue": "disk-build"},
+    "app.tasks.append_evidence_directory_task": {"queue": "disk-build"},
     "app.tasks.rag_index_task": {"queue": "rag-index"},
     "app.tasks.phase3_pipeline_task": {"queue": "disk-parse"},
     "app.tasks.phase3_shard_task": {"queue": "disk-parse"},

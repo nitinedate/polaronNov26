@@ -487,15 +487,11 @@ def _present_followup_extract(out: dict) -> dict:
     the card made 463,139 saved files look like they had fallen back to 1,521.
     """
     pp = out.get("pipeline_progress")
-    ds = out.get("disk_source") if isinstance(out.get("disk_source"), dict) else {}
     if not isinstance(pp, dict):
         return out
-    from app.services.next_evidence_directory import combine_saved_directory_counts
+    from app.services.next_evidence_directory import followup_activity_for_card
 
-    combined = combine_saved_directory_counts(
-        pp.get("extraction_activity") if isinstance(pp.get("extraction_activity"), dict) else None,
-        saved_files=int(ds.get("files_extracted") or 0),
-    )
+    combined = followup_activity_for_card(out)
     if not combined:
         return out
     pp = dict(pp)
@@ -3143,6 +3139,15 @@ def resume_job(
         )
         db.commit()
     if row["status"] == "disk_ready":
+        from app.services.next_evidence_directory import directory_copy_is_live, unfinished_directory_reason
+
+        pending_reason = unfinished_directory_reason(db, job_id, row) or ""
+        if directory_copy_is_live(row) or "starts after the current extraction" in pending_reason:
+            return {
+                "job_id": job_id,
+                "status": row["status"],
+                "message": "The next evidence directory is still being copied. Later stages start after it is saved.",
+            }
         art = fetchone(
             db,
             "SELECT count(*) c FROM job_artifacts WHERE job_id=:jid",

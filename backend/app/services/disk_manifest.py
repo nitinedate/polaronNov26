@@ -32,6 +32,19 @@ def upload_extract_nodes(job_id: str, nodes: list[dict], *, zstd_level: int = 1)
     return put_bytes(key, compressed, content_type="application/zstd")
 
 
+def upload_named_nodes(job_id: str, name: str, nodes: list[dict], *, zstd_level: int = 1) -> str:
+    """Persist one directory's file plan under its own object.
+
+    A later directory must not overwrite the first image's plan. A worker that
+    is killed during the copy reloads this object instead of walking the disk again.
+    """
+    safe = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in str(name or ""))[:96] or "nodes"
+    lines = "\n".join(json.dumps(n, separators=(",", ":")) for n in nodes).encode("utf-8")
+    compressed = zstd.ZstdCompressor(level=zstd_level).compress(lines)
+    key = f"{disk_prefix(job_id)}/plans/{safe}.jsonl.zst"
+    return put_bytes(key, compressed, content_type="application/zstd")
+
+
 def load_extract_nodes(nodes_uri: str) -> list[dict]:
     raw = get_bytes(nodes_uri)
     if not raw:

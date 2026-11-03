@@ -319,14 +319,109 @@ def _claim_append(db, job_id: str, owner: str) -> bool:
             WHERE id = :id
               AND (
                 COALESCE(disk_source #>> '{directory_append,owner}', '') = ''
-                OR COALESCE(disk_source #>> '{directory_append,heartbeat_at}', '0')::float
-                   < :stale
+                OR (
+                  COALESCE(disk_source #>> '{directory_append,heartbeat_at}', '0')::float < :stale
+                  AND updated_at < NOW() - INTERVAL '3 minutes'
+                )
               )
             RETURNING id""",
         {"id": job_id, "payload": payload, "stale": time.time() - _LOCK_STALE_SEC},
     )
     db.commit()
     return row is not None
+
+
+def directory_copy_is_live(row: dict | None, *, now: float | None = None) -> bool:
+    """True while the directory copy is still moving.
+
+    The filesystem walk holds the interpreter inside native code, so a thread
+    heartbeat can go quiet without the copy having stopped. A recent job update
+    from the packer is enough to keep a second walk from starting.
+    """
+    if not isinstance(row, dict):
+        return False
+    clock = time.time() if now is None else float(now)
+    source = row.get("disk_source") or {}
+    if isinstance(source, str):
+        try:
+            source = json.loads(source)
+        except (TypeError, ValueError):
+            source = {}
+    append = source.get("directory_append") if isinstance(source, dict) else None
+    if isinstance(append, dict):
+        try:
+            heartbeat = float(append.get("heartbeat_at") or 0)
+        except (TypeError, ValueError):
+            heartbeat = 0.0
+        if heartbeat and clock - heartbeat < _LOCK_STALE_SEC:
+            return True
+    updated = row.get("updated_at")
+    if updated is None:
+        return False
+    if isinstance(updated, str):
+        try:
+            from datetime import datetime
+            updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    if hasattr(updated, "timestamp"):
+        try:
+            return clock - float(updated.timestamp()) < _LOCK_STALE_SEC
+        except (TypeError, ValueError, OSError):
+            return False
+    return False
+
+
+def directory_extract_gate(db, job_id: str, schema_name: str) -> dict | None:
+    """Keep a later-stage worker from opening an image the disk worker owns.
+
+    Phase 3 runs on the parse pool. Opening the next disk image there started
+    one walk on every parse process, and the pool was then killed. The disk
+    worker is the only place that walk runs.
+    """
+    from app.db.sql_helpers import fetchone
+
+    reason = unfinished_directory_reason(db, job_id)
+    if reason is None:
+        return None
+    if reason.startswith("Waiting for every evidence directory"):
+        return {"status": "waiting", "reason": reason}
+    row = fetchone(db, "SELECT * FROM jobs WHERE id=:id", {"id": job_id}) or {}
+    if directory_copy_is_live(row):
+        return {"status": "busy", "reason": "The next evidence directory is already being extracted"}
+    source = row.get("disk_source") or {}
+    if isinstance(source, str):
+        try:
+            source = json.loads(source)
+        except (TypeError, ValueError):
+            source = {}
+    if not isinstance(source, dict):
+        source = {}
+    try:
+        queued_at = float(source.get("directory_append_queued_at") or 0)
+    except (TypeError, ValueError):
+        queued_at = 0.0
+    if time.time() - queued_at < _LOCK_STALE_SEC:
+        return {"status": "busy", "reason": "The next evidence directory is already queued on the disk worker"}
+    from app.db.sql_helpers import execute
+
+    execute(
+        db,
+        """UPDATE jobs
+              SET disk_source = jsonb_set(
+                    COALESCE(disk_source, '{}'::jsonb),
+                    '{directory_append_queued_at}',
+                    CAST(:payload AS jsonb),
+                    true
+                  )
+            WHERE id = :id""",
+        {"id": job_id, "payload": json.dumps(time.time())},
+    )
+    db.commit()
+    from app.tasks import append_evidence_directory_task
+
+    append_evidence_directory_task.delay(schema_name, job_id)
+    return {"status": "waiting", "reason": reason}
 
 
 def _heartbeat(schema_name: str, job_id: str, owner: str, stop: threading.Event) -> None:
@@ -400,6 +495,20 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
         daemon=True,
     )
     beater.start()
+    # A native filesystem walk can hold the interpreter long enough that the
+    # thread above never gets to write. This process has its own interpreter,
+    # so a quiet walk is not treated as a dead one and started again.
+    import subprocess
+    import sys
+
+    heartbeat_proc = None
+    try:
+        heartbeat_proc = subprocess.Popen(
+            [sys.executable, "-m", "app.services.directory_append_heartbeat", schema_name, job_id, owner],
+            start_new_session=True,
+        )
+    except Exception:
+        log.exception("directory append heartbeat process did not start job=%s", job_id)
     extracted: list[str] = []
     try:
         while True:
@@ -535,6 +644,8 @@ def extract_pending_directories(db, job_id: str, *, schema_name: str) -> dict[st
     finally:
         stop.set()
         beater.join(timeout=2)
+        if heartbeat_proc is not None and heartbeat_proc.poll() is None:
+            heartbeat_proc.terminate()
         try:
             _release_append(db, job_id, owner)
         except Exception:
@@ -630,6 +741,110 @@ def combine_saved_directory_counts(activity: dict | None, *, saved_files: int) -
     return combined
 
 
+def directory_shard_count(node_count: int, configured: int = 12) -> int:
+    """How many copy pieces one directory uses.
+
+    A single piece of a hundred thousand files builds a tar large enough for
+    the kernel to kill the worker. The task then starts the directory again.
+    """
+    count = int(node_count or 0)
+    if count < 2:
+        return 1
+    configured = max(int(configured or 1), 1)
+    by_size = max(1, (count + 19_999) // 20_000)
+    return min(count, 32, max(configured, by_size))
+
+
+def followup_activity_for_card(job: dict) -> dict | None:
+    """Keep the extract card in progress while another directory is still copying.
+
+    The first directory publishes a manifest as soon as it is saved. The card
+    treats that manifest as a finished extraction unless this copy is marked
+    as the next directory. A follow-up counter that started at zero also gets
+    the saved files added back.
+    """
+    progress = job.get("pipeline_progress") if isinstance(job.get("pipeline_progress"), dict) else {}
+    activity = progress.get("extraction_activity") if isinstance(progress.get("extraction_activity"), dict) else None
+    if activity is None:
+        return None
+    source = job.get("disk_source") if isinstance(job.get("disk_source"), dict) else {}
+    shown = dict(activity)
+    if _saved_manifest_still_copying(job, shown):
+        shown["next_directory"] = True
+    combined = combine_saved_directory_counts(
+        shown, saved_files=int(source.get("files_extracted") or 0),
+    )
+    if combined is not None:
+        return combined
+    if shown.get("next_directory") and not activity.get("next_directory"):
+        return shown
+    return None
+
+
+def _saved_manifest_still_copying(job: dict, activity: dict) -> bool:
+    if str(activity.get("subphase") or "") != "copying":
+        return False
+    if not str(job.get("extracted_disk_uri") or "").strip():
+        return False
+    planned = int(activity.get("files_total") or job.get("files_total") or 0)
+    live = max(
+        int(activity.get("files_packed") or 0),
+        int(activity.get("files_extracted") or 0),
+        int(activity.get("files_uploaded") or 0),
+        int(job.get("files_extracted") or 0),
+    )
+    return planned > 0 and live < planned
+
+
+def _directory_plan(db, job_id: str, namespace: str) -> dict | None:
+    from app.db.sql_helpers import fetchone
+
+    row = fetchone(db, "SELECT disk_source FROM jobs WHERE id=:id", {"id": job_id}) or {}
+    source = row.get("disk_source") or {}
+    if isinstance(source, str):
+        try:
+            source = json.loads(source)
+        except (TypeError, ValueError):
+            source = {}
+    plans = source.get("directory_plans") if isinstance(source, dict) else None
+    plan = plans.get(namespace) if isinstance(plans, dict) else None
+    if isinstance(plan, str):
+        plan = {"uri": plan}
+    if not isinstance(plan, dict) or not str(plan.get("uri") or "").strip():
+        return None
+    return plan
+
+
+def _store_directory_plan(
+    db, job_id: str, namespace: str, nodes: list[dict], *, enumerated: int, filtered_out: int,
+) -> str:
+    from app.db.sql_helpers import execute
+    from app.services.disk_manifest import upload_named_nodes
+
+    uri = upload_named_nodes(job_id, namespace, nodes)
+    record = {
+        "uri": uri,
+        "files": len(nodes),
+        "enumerated": int(enumerated),
+        "filtered_out": int(filtered_out),
+    }
+    execute(
+        db,
+        """UPDATE jobs
+              SET disk_source = jsonb_set(
+                    COALESCE(disk_source, '{}'::jsonb),
+                    '{directory_plans}',
+                    COALESCE(disk_source->'directory_plans', '{}'::jsonb) || CAST(:patch AS jsonb),
+                    true
+                  ),
+                  updated_at = NOW()
+            WHERE id = :id""",
+        {"id": job_id, "patch": json.dumps({namespace: record})},
+    )
+    db.commit()
+    return uri
+
+
 def _extract_one_directory(
     db,
     job_id: str,
@@ -683,41 +898,92 @@ def _extract_one_directory(
             raise RuntimeError(
                 f"Could not mount {group['label']}. Its segment files were not used as extracted files."
             )
-        enumerated = _enumerate_mounted_image(
-            one,
-            on_progress=lambda message, metadata=None: None,
-            schema_name=schema_name,
-        )
-        if not enumerated:
-            raise RuntimeError(
-                f"Directory {position} of {total} ({group['directory']}) mounted but returned "
-                "no filesystem entries. Evidence was not marked processed."
-            )
-        # Separate images may belong to different operating systems. Determine
-        # filtering rules from this source, not the first source's OS.
-        os_info = detect_os_from_paths(enumerated)
-        nodes, filter_stats = _filter_nodes(enumerated, settings, os_info=os_info, mode_override=mode)
         label = str(group["label"])
         namespace = str(group["namespace"])
-        for node in nodes:
-            rel = str(node.get("path") or "").replace("\\", "/").lstrip("/")
-            node["source_path"] = rel
-            node["path"] = f"{namespace}/{rel}" if rel else namespace
-        write_disk_log(
-            db,
-            job_id,
-            f"Directory {position} of {total} listed {len(enumerated):,} files from {label}. "
-            f"The same filter kept {len(nodes):,} "
-            f"({int(filter_stats.get('filtered_out') or 0):,} pre-filtered).",
-            stage="extract",
-            metadata={
-                "directory": group["directory"],
-                "files_enumerated": len(enumerated),
-                "files_kept": len(nodes),
-                "pre_filtered": int(filter_stats.get("filtered_out") or 0),
-            },
-        )
-        db.commit()
+        plan = _directory_plan(db, job_id, namespace)
+        nodes: list[dict] = []
+        filter_stats: dict = {"filtered_out": 0}
+        if plan is not None:
+            from app.services.disk_manifest import load_extract_nodes
+
+            try:
+                nodes = load_extract_nodes(str(plan["uri"]))
+            except Exception:
+                log.exception("saved directory plan could not be read job=%s", job_id)
+                nodes = []
+            if nodes:
+                filter_stats = {
+                    "filtered_out": int(plan.get("filtered_out") or 0),
+                    "resumed": True,
+                }
+                write_disk_log(
+                    db,
+                    job_id,
+                    f"Directory {position} of {total} is continuing from its saved file plan "
+                    f"({len(nodes):,} files from {label}). The filesystem is not walked again.",
+                    stage="extract",
+                    metadata={"directory": group["directory"], "files_kept": len(nodes), "resumed": True},
+                )
+                db.commit()
+        if not nodes:
+            enumerated = _enumerate_mounted_image(
+                one,
+                on_progress=lambda message, metadata=None: None,
+                schema_name=schema_name,
+            )
+            if not enumerated:
+                raise RuntimeError(
+                    f"Directory {position} of {total} ({group['directory']}) mounted but returned "
+                    "no filesystem entries. Evidence was not marked processed."
+                )
+            # Separate images may belong to different operating systems. Determine
+            # filtering rules from this source, not the first source's OS.
+            os_info = detect_os_from_paths(enumerated)
+            nodes, filter_stats = _filter_nodes(enumerated, settings, os_info=os_info, mode_override=mode)
+            enumerated_count = len(enumerated)
+            for node in nodes:
+                rel = str(node.get("path") or "").replace("\\", "/").lstrip("/")
+                node["source_path"] = rel
+                node["path"] = f"{namespace}/{rel}" if rel else namespace
+            del enumerated
+            import gc
+            gc.collect()
+            write_disk_log(
+                db,
+                job_id,
+                f"Directory {position} of {total} listed {enumerated_count:,} files from {label}. "
+                f"The same filter kept {len(nodes):,} "
+                f"({int(filter_stats.get('filtered_out') or 0):,} pre-filtered).",
+                stage="extract",
+                metadata={
+                    "directory": group["directory"],
+                    "files_enumerated": enumerated_count,
+                    "files_kept": len(nodes),
+                    "pre_filtered": int(filter_stats.get("filtered_out") or 0),
+                },
+            )
+            db.commit()
+            if nodes:
+                try:
+                    _store_directory_plan(
+                        db,
+                        job_id,
+                        namespace,
+                        nodes,
+                        enumerated=enumerated_count,
+                        filtered_out=int(filter_stats.get("filtered_out") or 0),
+                    )
+                    write_disk_log(
+                        db,
+                        job_id,
+                        f"Directory {position} of {total} file plan is saved ({len(nodes):,} files). "
+                        "A restarted worker continues this copy and does not walk the disk again.",
+                        stage="extract",
+                        metadata={"directory": group["directory"], "files_kept": len(nodes)},
+                    )
+                    db.commit()
+                except Exception:
+                    log.exception("directory file plan was not saved job=%s", job_id)
         if not nodes:
             return _publish_directory(
                 db,
@@ -732,7 +998,7 @@ def _extract_one_directory(
                 filter_stats=filter_stats,
             )
 
-        worker_count = 1 if len(nodes) < 2 else min(4, len(nodes))
+        worker_count = directory_shard_count(len(nodes), int(settings.extract_shard_count or 12))
         local_shards = _shard_nodes(nodes, worker_count, strategy="byte_range_v53")
         occupied = [int(key) for key in (manifest.get("parts_map") or {})]
         if not occupied and manifest.get("parts"):

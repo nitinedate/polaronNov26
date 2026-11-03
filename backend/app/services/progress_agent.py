@@ -453,57 +453,18 @@ def reconcile_count_complete_stage(db, job_id: str, stage: dict) -> dict | None:
     return {"completed": False, "summary": summary, **state}
 
 def _queue_pending_directory(db, job, *, schema_name: str) -> None:
-    """Start a saved directory that the first extract left behind.
+    """Ask the disk worker to copy a directory the first extract left behind.
 
-    Later stages may already be running. The directory extract uses its own
-    claim and does not restart those stages.
+    This used to queue Phase 3. Phase 3 runs on the parse pool, and each queued
+    copy opened the image again until the pool was killed.
     """
     job_id = str(job.get("id") or "")
     if not job_id:
         return
     try:
-        from app.services.next_evidence_directory import unfinished_directory_reason
+        from app.services.next_evidence_directory import directory_extract_gate
 
-        reason = unfinished_directory_reason(db, job_id, job)
-        if not reason or "starts after" not in reason:
-            return
-        source = job.get("disk_source") or {}
-        if isinstance(source, str):
-            source = json.loads(source)
-        if not isinstance(source, dict):
-            source = {}
-        append = source.get("directory_append") if isinstance(source.get("directory_append"), dict) else {}
-        try:
-            heartbeat = float(append.get("heartbeat_at") or 0)
-        except (TypeError, ValueError):
-            heartbeat = 0.0
-        try:
-            queued_at = float(source.get("directory_append_queued_at") or 0)
-        except (TypeError, ValueError):
-            queued_at = 0.0
-        now = time.time()
-        if now - heartbeat < 180 or now - queued_at < 180:
-            return
-        execute(
-            db,
-            """UPDATE jobs
-                  SET disk_source = jsonb_set(
-                        COALESCE(disk_source, '{}'::jsonb),
-                        '{directory_append_queued_at}',
-                        CAST(:payload AS jsonb),
-                        true
-                      ),
-                      updated_at = NOW()
-                WHERE id = :id""",
-            {"id": job_id, "payload": json.dumps(now)},
-        )
-        from app.services.disk_build_log import write_disk_log
-
-        write_disk_log(db, job_id, reason, stage="extract")
-        db.commit()
-        from app.tasks import phase3_pipeline_task
-
-        phase3_pipeline_task.delay(schema_name, job_id)
+        directory_extract_gate(db, job_id, schema_name)
     except Exception:
         log.exception("pending directory was not queued job=%s", job_id)
         try:

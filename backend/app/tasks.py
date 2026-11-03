@@ -219,8 +219,12 @@ def _phase3_pipeline_body(schema_name: str, job_id: str, extract_pending_directo
     from app.services.job_control import JobStopRequested
 
     with firm_session(schema_name) as db:
-        pending = extract_pending_directories(db, job_id, schema_name=schema_name)
-    if pending.get("status") in {"busy", "waiting"}:
+        from app.services.next_evidence_directory import directory_extract_gate
+
+        # This task runs on the parse pool. Walking the next disk image here
+        # opened the same evidence on every parse process until one was killed.
+        pending = directory_extract_gate(db, job_id, schema_name)
+    if pending is not None:
         return pending
     serial = _serial_handoff(schema_name, job_id, retry_failed=True)
     if serial is not None:
@@ -2525,6 +2529,23 @@ def phase3_shard_task(schema_name: str, job_id: str, shard_id: int) -> dict:
 def phase3_finalize_task(schema_name: str, job_id: str) -> dict:
     log.info("Phase 3 finalize job=%s schema=%s", job_id, schema_name)
     return phase3_finalize_sync(schema_name, job_id)
+
+
+@celery.task(name="app.tasks.append_evidence_directory_task")
+def append_evidence_directory_task(schema_name: str, job_id: str) -> dict:
+    """Copy the next evidence directory on the disk worker.
+
+    The parse pool used to do this inside Phase 3. Several parse processes then
+    opened the same image and one was killed.
+    """
+    from app.services.next_evidence_directory import extract_pending_directories
+
+    log.info("Append evidence directory job=%s schema=%s", job_id, schema_name)
+    with firm_session(schema_name) as db:
+        result = extract_pending_directories(db, job_id, schema_name=schema_name)
+    if result.get("status") == "extracted":
+        phase3_pipeline_task.apply_async(args=(schema_name, job_id), countdown=15)
+    return result
 
 
 @celery.task(
