@@ -260,13 +260,18 @@ def _event(db, job_id, stage, decision, reason, *, details=None):
         from app.services.disk_build_log import write_disk_log
         # The card already shows counts. Repeating the same wait on every pass
         # made the extraction log look like a stuck loop.
-        noisy = str(reason or "").startswith((
+        text = str(reason or "")
+        # A completed walk used to be logged again every 90s because the idle
+        # count changed. That line is not an extraction event.
+        noisy = text.startswith((
             "Still writing", "Useful work advanced", "Bounded operation",
             "Delivery is within", "Paused by the user", "Owning stage is still running",
             "Chunk barrier", "OCR quality triage", "A bounded dependency",
             "Quality triage", "No unfinished work found", "Neo4j unavailable",
-            "Deadlock", "Priority evidence",
-        ))
+            "Deadlock", "Priority evidence", "TSK walk finished",
+        )) or (
+            "no useful entry progress" in text and "reader phase=complete" in text
+        )
         logged = f"progressAgent: {reason}"
         last = None if noisy else fetchone(
             db,
@@ -660,6 +665,7 @@ def acquisition_fingerprint(job: dict) -> str:
         activity.get("entries_scanned"), activity.get("directories_scanned"),
         activity.get("files_extracted"), activity.get("bytes_extracted"),
         activity.get("shards_done"), activity.get("unreadable_directories"),
+        activity.get("files_scanned"),
         activity.get("last_path"), activity.get("alias_directories_skipped"),
         len(checkpoint.get("completed_shards") or []),
         checkpoint.get("files_extracted"), checkpoint.get("bytes_extracted"),
@@ -667,10 +673,51 @@ def acquisition_fingerprint(job: dict) -> str:
     return "extract:" + hashlib.sha256(json.dumps(payload, default=str).encode()).hexdigest()
 
 
+def _post_walk_planning(job: dict) -> bool:
+    """True once the filesystem walk has finished and file copy has not started.
+
+    Guest-OS detection and extract filtering keep the walk counters frozen.
+    That is saved work, not a stalled native reader.
+    """
+    activity = _obj(job.get("pipeline_progress")).get("extraction_activity") or {}
+    subphase = str(activity.get("subphase") or "")
+    if subphase in {"detecting_os", "filtering"}:
+        return True
+    if subphase not in {"", "preparing", "enumerating"}:
+        return False
+    if str(activity.get("reader_phase") or "") == "complete":
+        return True
+    checkpoint = _obj(job.get("extraction_checkpoint"))
+    return bool(checkpoint.get("nodes_uri") or int(checkpoint.get("nodes_total") or 0) > 0)
+
+
+def _finished_walk_reason(job: dict) -> str:
+    """Stable text. A changing idle count made every 90s check a new log line."""
+    activity = _obj(job.get("pipeline_progress")).get("extraction_activity") or {}
+    files = int(activity.get("files_found") or 0)
+    dirs = int(activity.get("directories_scanned") or 0)
+    scanned = int(activity.get("files_scanned") or 0)
+    subphase = str(activity.get("subphase") or "")
+    if subphase == "filtering":
+        tail = f"extract filtering is reviewing that inventory ({scanned:,} reviewed)."
+    elif subphase == "detecting_os":
+        tail = "guest OS detection is reviewing that inventory."
+    elif _obj(job.get("extraction_checkpoint")).get("nodes_uri"):
+        tail = "the file plan is already saved."
+    else:
+        tail = "the same extraction is saving the file plan."
+    return (
+        f"TSK walk finished — {files:,} files, {dirs:,} directories. "
+        f"{tail} The walk stays with its owner and no duplicate extraction is queued."
+    )
+
+
 def acquisition_diagnosis(job: dict, age_seconds: float) -> str:
     """Explain exactly which slow sub-operation the examiner should inspect."""
     activity = _obj(job.get("pipeline_progress")).get("extraction_activity") or {}
     subphase = str(activity.get("subphase") or "preparing")
+    if _post_walk_planning(job):
+        return _finished_walk_reason(job)
     if subphase == "enumerating":
         files = int(activity.get("files_found") or 0)
         dirs = int(activity.get("directories_scanned") or 0)
@@ -696,6 +743,8 @@ def acquisition_diagnosis(job: dict, age_seconds: float) -> str:
                 detail = f"native reader phase={phase}; inspect image reopen/partition mount and segment I/O"
         else:
             detail = f"reader phase={phase}; last path={last}"
+        if phase == "complete":
+            return _finished_walk_reason(job)
         return (f"TSK filesystem walk: no useful entry progress for {int(age_seconds)}s; "
                 f"attempt={attempt} ({inventory_mode}), files={files:,}, dirs={dirs:,}, "
                 f"entries={entries:,}, unreadable={errors:,}; "
@@ -743,26 +792,33 @@ def inspect_acquisition_progress(db, job: dict, *, schema_name: str, now=None) -
         except (TypeError, ValueError, OverflowError):
             pass
     diagnostic_age = min(age, attempt_age)
-    if age < warn_at:
+    post_walk = _post_walk_planning(job)
+    if not post_walk and age < warn_at:
         db.commit()
         return {"status": "progressing", "reason": "Useful extraction progress observed", "job_id": jid,
                 "useful_progress_age_sec": int(age)}
-    if diagnostic_age < warn_at:
+    if not post_walk and diagnostic_age < warn_at:
         db.commit()
         return {"status": "valid_wait", "reason": "New isolated reader attempt is inside its monitoring grace period; no new evidence entries yet",
                 "job_id": jid, "reader_attempt_age_sec": int(attempt_age),
                 "useful_progress_age_sec": int(age)}
     # Keep log/event output stable for a window instead of changing a duration
     # number every 15s and flooding the case's immutable forensic audit log.
+    # A finished walk uses one unchanging reason: the old text included the
+    # idle seconds, so 900s, 990s and 1080s were each written as a new stall.
     elapsed_bucket = warn_at * max(1, int(diagnostic_age // warn_at))
-    diagnosis = acquisition_diagnosis(job, elapsed_bucket)
+    diagnosis = _finished_walk_reason(job) if post_walk else acquisition_diagnosis(job, elapsed_bucket)
     live_task = extract_celery_work_active(jid)
     # Avoid releasing a lock based on DB heartbeats. Celery absence must be
     # confirmed before extract_task_in_flight is allowed to inspect stale locks.
     if live_task is True or live_task is None:
-        status = "investigate" if live_task is True else "valid_wait"
-        reason = diagnosis + (" Isolated TSK watchdog owns bounded recovery; no duplicate task queued."
-                              if live_task is True else " Worker inspection unavailable; no unsafe redispatch.")
+        if post_walk:
+            status = "valid_wait"
+            reason = diagnosis
+        else:
+            status = "investigate" if live_task is True else "valid_wait"
+            reason = diagnosis + (" Isolated TSK watchdog owns bounded recovery; no duplicate task queued."
+                                  if live_task is True else " Worker inspection unavailable; no unsafe redispatch.")
     else:
         has_lock = extract_task_in_flight(db, jid, idle_sec=180)
         if has_lock:

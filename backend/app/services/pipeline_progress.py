@@ -57,10 +57,30 @@ def merge_pipeline_progress(
 
     # A same-phase diagnostic write (an E01 read trace) must not replace the
     # inventory counters with zeros. A real subphase change still replaces them.
+    # A finished walk must not be rewound by a late reader heartbeat: that made
+    # guest-OS detection and filtering look like a stalled TSK walk.
     old_activity = merged.get("extraction_activity")
     new_activity = update.get("extraction_activity")
     if isinstance(old_activity, dict) and isinstance(new_activity, dict):
-        if str(new_activity.get("subphase") or "") == str(old_activity.get("subphase") or ""):
+        order = {
+            "preparing": 0, "enumerating": 1, "detecting_os": 2,
+            "filtering": 3, "copying": 4, "finalizing": 5,
+        }
+        old_sub = str(old_activity.get("subphase") or "")
+        new_sub = str(new_activity.get("subphase") or "")
+        old_rank = order.get(old_sub)
+        new_rank = order.get(new_sub)
+        late_finished_walk = (
+            old_rank is not None and new_rank is not None and new_rank < old_rank
+            and str(new_activity.get("reader_phase") or "") in {"", "complete"}
+        )
+        if late_finished_walk:
+            update.pop("extraction_activity", None)
+            if old_sub in {"detecting_os", "filtering", "copying", "finalizing"}:
+                update.pop("label", None)
+                update.pop("completed", None)
+                update.pop("total", None)
+        elif old_sub == new_sub:
             update["extraction_activity"] = {**old_activity, **new_activity}
 
     inv_active = inventory_progress_active(merged) or inventory_progress_active({**merged, **update})

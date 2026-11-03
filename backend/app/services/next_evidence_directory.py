@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 import uuid
-from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any
 
 log = logging.getLogger("next_evidence_directory")
@@ -44,6 +44,41 @@ def pending_directories(
         for group in list_image_directories(files, preferred_directories=directories)
         if directory_key(group["directory"]) not in saved_dirs
     ]
+
+
+def lead_with_saved_image(
+    groups: list[dict], *, base_name: str = "", segment_count: int = 0,
+) -> list[dict]:
+    """Keep the image that already has a saved plan as directory 1.
+
+    A later image that finished registering must not take the first slot and
+    be read with the earlier image's file plan. Every other directory stays
+    after it, in the order it was already listed.
+    """
+    if len(groups) <= 1:
+        return list(groups)
+    match = None
+    count = int(segment_count or 0)
+    if count:
+        sized = [group for group in groups if len(group.get("paths") or []) == count]
+        if len(sized) == 1:
+            match = sized[0]
+    saved = str(base_name or "").casefold()
+    if match is None and saved:
+        hits = []
+        for group in groups:
+            label = str(group.get("label") or "").casefold()
+            stems = [
+                PurePosixPath(str(path).replace("\\", "/")).stem.casefold()
+                for path in (group.get("paths") or [])
+            ]
+            if saved == label or saved in stems:
+                hits.append(group)
+        if len(hits) == 1:
+            match = hits[0]
+    if match is None:
+        return list(groups)
+    return [match, *[group for group in groups if group is not match]]
 
 
 def restrict_to_next_directory(

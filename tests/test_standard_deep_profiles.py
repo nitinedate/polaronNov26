@@ -17,7 +17,7 @@ def test_extraction_uses_selected_mode_on_every_filter_pass():
     # V2026-10-21: Standard has its own extraction mode (was "defensible", which
     # on Windows extracted nearly the same file set as Deep).
     assert '"standard": "standard", "deep": "full"' in s
-    assert s.count('_filter_nodes(all_nodes, settings, os_info=os_info, mode_override=mode)') == 2
+    assert s.count('os_info=os_info, mode_override=mode') == 2
     assert 'merged["processing_profile"] = prior["processing_profile"]' in s
 
 def test_signature_carve_not_mandatory_in_standard():

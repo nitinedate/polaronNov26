@@ -66,6 +66,44 @@ def test_read_trace_keeps_enumeration_counters():
     assert merged["label"].startswith("Filesystem inventory — 52")
 
 
+def test_finished_walk_heartbeat_cannot_rewind_filtering():
+    existing = {
+        "phase": "extract",
+        "label": "Applying extract filters — 10,000 / 684,797",
+        "completed": 10000,
+        "total": 684797,
+        "extraction_activity": {
+            "subphase": "filtering",
+            "reader_phase": "complete",
+            "files_found": 684797,
+            "files_scanned": 10000,
+        },
+    }
+    update = {
+        "phase": "extract",
+        "label": "Filesystem inventory — 684,797 files",
+        "completed": 684797,
+        "extraction_activity": {
+            "subphase": "enumerating",
+            "reader_phase": "complete",
+            "files_found": 684797,
+            "last_path": "$Extend/$Deleted",
+        },
+    }
+    merged = merge_pipeline_progress(existing, update, writer="extract")
+    assert merged["extraction_activity"]["subphase"] == "filtering"
+    assert merged["extraction_activity"]["files_scanned"] == 10000
+    assert merged["label"].startswith("Applying extract filters")
+
+
+def test_new_walk_can_replace_an_older_filter_phase():
+    existing = {"extraction_activity": {"subphase": "filtering", "reader_phase": "complete"}}
+    update = {"extraction_activity": {"subphase": "enumerating", "reader_phase": "root_open", "files_found": 0}}
+    merged = merge_pipeline_progress(existing, update, writer="extract")
+    assert merged["extraction_activity"]["subphase"] == "enumerating"
+    assert merged["extraction_activity"]["reader_phase"] == "root_open"
+
+
 def test_copy_phase_replaces_enumeration_activity():
     existing = {
         "extraction_activity": {

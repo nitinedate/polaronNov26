@@ -2877,6 +2877,17 @@ def _queue_disk_build(db: Session, schema: str, job_id: str, *, force: bool = Fa
 
     if not force and row and row["status"] in ("building_disk", "processing") and not extraction_is_stale(row):
         return
+    from app.services.extract_review import release_pending_review
+
+    if release_pending_review(db, job_id):
+        from app.services.disk_build_log import write_disk_log
+
+        write_disk_log(
+            db,
+            job_id,
+            "Continuing extraction from the saved file plan. The review pause is released and file copy starts.",
+            stage="extract",
+        )
     execute(db, "UPDATE jobs SET status='processing', error=NULL, updated_at=NOW() WHERE id=:job_id", {"job_id": job_id})
     from app.config import get_settings
     from app.services.pipeline_orchestrator import init_pipeline_orchestration, mark_pipeline_agent_running
@@ -3143,7 +3154,16 @@ def resume_job(
             }
         return {"job_id": job_id, "status": "disk_ready", "message": "Extraction already complete"}
     cp = load_extraction_checkpoint(db, job_id)
-    if not cp or not cp.get("completed_shards"):
+    # A review pause saves the file plan before any shard is copied. That plan
+    # is the resume point; an empty completed_shards list is not "no checkpoint".
+    # Registered evidence is also enough: stopping here left the case on
+    # "No extraction checkpoint found" with the files still uncopied.
+    has_saved_plan = bool(
+        cp and (cp.get("nodes_uri") or cp.get("completed_shards") or int(cp.get("nodes_total") or 0) > 0)
+    )
+    evidence = fetchone(db, "SELECT count(*) c FROM evidence_files WHERE job_id=:id", {"id": job_id})
+    has_evidence = bool(evidence and int(evidence.get("c") or 0) > 0)
+    if not has_saved_plan and not has_evidence:
         if row["status"] in ("created", "registered", "awaiting_segments", "failed"):
             schema = _schema_name(db, current)
             try:
@@ -3181,11 +3201,15 @@ def resume_job(
                 }
             },
         ) from exc
-    shards_done = len(cp.get("completed_shards") or [])
+    shards_done = len((cp or {}).get("completed_shards") or [])
+    if shards_done:
+        message = f"Resuming extraction from checkpoint ({shards_done} shard(s) already complete)"
+    else:
+        message = "Resuming extraction from the saved file plan. Later evidence directories are appended after this one is saved."
     return {
         "job_id": job_id,
         "status": "processing",
-        "message": f"Resuming extraction from checkpoint ({shards_done} shard(s) already complete)",
+        "message": message,
     }
 
 

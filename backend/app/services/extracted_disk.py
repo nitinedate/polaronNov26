@@ -62,6 +62,25 @@ def _mark_live_step(job_id: str, name: str, **extra) -> None:
     except Exception:
         pass
 
+
+def _publish_extract_activity(schema_name: str, job_id: str, activity: dict, *, label: str | None = None) -> None:
+    """Publish post-walk planning so a finished TSK inventory is not a stalled walk."""
+    payload = dict(activity)
+    if label:
+        payload["label"] = label
+    try:
+        from app.db.session import firm_session
+        from app.services.pipeline_progress import write_merged_pipeline_progress
+
+        update: dict = {"phase": "extract", "extraction_activity": payload}
+        if label:
+            update["label"] = label
+        with firm_session(schema_name) as progress_db:
+            write_merged_pipeline_progress(progress_db, job_id, update, writer="extract")
+            progress_db.commit()
+    except Exception:
+        log.debug("extract planning progress failed for job %s", job_id, exc_info=True)
+
 log = logging.getLogger("extracted_disk")
 
 _PROGRESS_LOG_INTERVAL_SEC = 12
@@ -316,6 +335,7 @@ def _filter_nodes(
     *,
     os_info: dict | None = None,
     mode_override: str | None = None,
+    on_progress=None,
 ) -> tuple[list[dict], dict]:
     """Pre-filter file list before sharding — avoids expensive TSK reads on junk paths.
 
@@ -360,7 +380,13 @@ def _filter_nodes(
         classify_os_vendor_standard = lambda *a, **k: None  # noqa: E731
     standard_mode = mode == "standard"
     stats["os_vendor_mode"] = "skip" if standard_mode else os_vendor_mode()
-    for node in nodes:
+    total_nodes = len(nodes)
+    for index, node in enumerate(nodes, start=1):
+        if on_progress and (index == 1 or index == total_nodes or index % 10000 == 0):
+            try:
+                on_progress(index, total_nodes)
+            except Exception:
+                log.debug("extract filter progress failed", exc_info=True)
         rel = node["path"]
         size = int(node.get("size_bytes") or 0)
         if standard_mode:
@@ -1496,8 +1522,12 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
         )
         enum_coverage = {"unreadable_directories": 0, "alias_directories_skipped": 0,
                          "metadata_missing": 0}
+        latest_enum_activity: dict = {"subphase": "enumerating", "files_found": 0}
+        walk_closed = {"done": False}
 
         def on_enum_progress(message: str, metadata: dict | None = None) -> None:
+            if walk_closed["done"]:
+                return
             log_enum_progress(message, metadata)
             enum_coverage["unreadable_directories"] = max(
                 enum_coverage["unreadable_directories"],
@@ -1560,6 +1590,12 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
                 activity["last_source_read_offset"] = meta.get("last_source_read_offset")
             if meta.get("last_source_read_size") is not None:
                 activity["last_source_read_size"] = meta.get("last_source_read_size")
+            if meta.get("files_scanned") is not None:
+                activity["files_scanned"] = int(meta.get("files_scanned") or 0)
+            if "reader_attempt" not in activity and meta.get("attempt") is not None:
+                activity["reader_attempt"] = int(meta.get("attempt") or 0)
+            latest_enum_activity.clear()
+            latest_enum_activity.update(activity)
             try:
                 from app.db.session import firm_session
                 from app.services.pipeline_progress import write_merged_pipeline_progress
@@ -1714,6 +1750,7 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
             else:
                 all_nodes = enumerate_all_files(vd, on_progress=on_enum_progress)
 
+        walk_closed["done"] = True
         if not all_nodes:
             root_hint = getattr(vd, "root_folder", None) or (vd.segment_paths[0] if vd.segment_paths else "?")
             msg = (
@@ -1734,6 +1771,25 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
         )
         db.commit()
 
+        def _publish_plan(subphase: str, scanned: int, label: str) -> None:
+            _publish_extract_activity(
+                schema_name,
+                job_id,
+                {
+                    **latest_enum_activity,
+                    "subphase": subphase,
+                    "reader_phase": "complete",
+                    "files_found": len(all_nodes),
+                    "files_scanned": scanned,
+                },
+                label=label,
+            )
+
+        _publish_plan(
+            "detecting_os",
+            0,
+            f"Detecting guest OS — {len(all_nodes):,} files",
+        )
         os_info = detect_os_from_paths(all_nodes)
         if (os_info or {}).get("family") in (None, "unknown") and vd.format in ("pas", "mobile", "ufd", "zip"):
             from app.services.mobile_os import load_job_disk_source
@@ -1791,7 +1847,14 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
             stage="extract",
             interval_sec=15.0,
         ):
-            nodes, filter_stats = _filter_nodes(all_nodes, settings, os_info=os_info, mode_override=mode)
+            nodes, filter_stats = _filter_nodes(
+                all_nodes, settings, os_info=os_info, mode_override=mode,
+                on_progress=lambda scanned, total: _publish_plan(
+                    "filtering",
+                    scanned,
+                    f"Applying extract filters — {scanned:,} / {total:,} files",
+                ),
+            )
             # Namespace after OS detection/filtering: their rules evaluate native
             # paths such as Windows/System32, not prefixed artifact paths.
             namespace = str(getattr(vd, "evidence_namespace", "") or "")
@@ -2034,8 +2097,24 @@ def build_extracted_disk_to_minio(db, job_id: str, vd: VirtualDisk, *, schema_na
             schema_name, job_id, "Re-enumerating filesystem tree", stage="extract", interval_sec=15.0
         ):
             all_nodes = enumerate_all_files(vd, on_progress=on_enum_progress)
+        _publish_extract_activity(
+            schema_name, job_id,
+            {"subphase": "detecting_os", "reader_phase": "complete", "files_found": len(all_nodes), "files_scanned": 0},
+            label=f"Detecting guest OS — {len(all_nodes):,} files",
+        )
         os_info = detect_os_from_paths(all_nodes)
-        nodes, filter_stats = _filter_nodes(all_nodes, settings, os_info=os_info, mode_override=mode)
+
+        def _replan_filter_progress(scanned: int, total: int) -> None:
+            _publish_extract_activity(
+                schema_name, job_id,
+                {"subphase": "filtering", "reader_phase": "complete",
+                 "files_found": len(all_nodes), "files_scanned": scanned},
+                label=f"Applying extract filters — {scanned:,} / {total:,} files",
+            )
+
+        nodes, filter_stats = _filter_nodes(
+            all_nodes, settings, os_info=os_info, mode_override=mode, on_progress=_replan_filter_progress,
+        )
         from app.services.disk_manifest import upload_extract_nodes
 
         nodes_uri = upload_extract_nodes(job_id, nodes, zstd_level=settings.extract_zstd_level)

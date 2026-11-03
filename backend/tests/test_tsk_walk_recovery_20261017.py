@@ -215,6 +215,93 @@ def test_ewf_metadata_reads_reuse_one_decompressed_window():
     assert seeks == [0]
 
 
+def test_finished_walk_warning_stays_the_same_as_time_passes(monkeypatch):
+    now = datetime.now(timezone.utc)
+    job = {'id': 'job-1', 'status': 'processing', 'pipeline_progress': {'extraction_activity': {
+        'subphase': 'enumerating', 'reader_phase': 'complete',
+        'files_found': 684797, 'directories_scanned': 110408,
+        'entries_scanned': 1016020, 'last_path': '$Extend/$Deleted',
+        'inventory_mode': 'serial'}}}
+    monkeypatch.setattr(progress_agent, 'execute', lambda *a, **k: None)
+    monkeypatch.setattr(progress_agent, 'fetchone', lambda *a, **k:
+        {'last_change_at': now - timedelta(minutes=20), 'acquisition_recoveries': 0})
+    monkeypatch.setattr('app.services.job_locks.extract_celery_work_active', lambda *_: True)
+    monkeypatch.setattr(progress_agent, '_event', lambda *a, **k: None)
+
+    class DB:
+        def commit(self):
+            pass
+
+    first = progress_agent.inspect_acquisition_progress(DB(), job, schema_name='test', now=now)
+    second = progress_agent.inspect_acquisition_progress(
+        DB(), job, schema_name='test', now=now + timedelta(seconds=180))
+    assert first['status'] == second['status'] == 'valid_wait'
+    assert first['reason'] == second['reason']
+    assert 'no useful entry progress' not in first['reason']
+    assert 'serial fallback' not in first['reason']
+    assert '900' not in first['reason'] and '1080' not in first['reason']
+
+
+def test_completed_walk_is_not_a_stalled_reader():
+    job = {'pipeline_progress': {'extraction_activity': {
+        'subphase': 'enumerating', 'reader_phase': 'complete',
+        'files_found': 684797, 'directories_scanned': 110408,
+        'entries_scanned': 1016020, 'last_path': '$Extend/$Deleted',
+        'inventory_mode': 'serial'}}}
+    msg = progress_agent.acquisition_diagnosis(job, 270)
+    assert 'TSK walk finished' in msg
+    assert 'serial fallback' not in msg
+    assert '684,797' in msg
+
+
+def test_filter_progress_is_useful_acquisition_progress():
+    row = {'pipeline_progress': {'extraction_activity': {
+        'subphase': 'filtering', 'files_found': 684797, 'files_scanned': 10000}}}
+    first = progress_agent.acquisition_fingerprint(row)
+    row['pipeline_progress']['extraction_activity']['files_scanned'] = 20000
+    assert progress_agent.acquisition_fingerprint(row) != first
+    msg = progress_agent.acquisition_diagnosis(row, 180)
+    assert 'extract filtering' in msg
+    assert 'serial fallback' not in msg
+
+
+def test_live_owner_of_finished_walk_is_not_redispatched(monkeypatch):
+    now = datetime.now(timezone.utc)
+    job = {'id': 'job-1', 'status': 'processing', 'pipeline_progress': {'extraction_activity': {
+        'subphase': 'filtering', 'reader_phase': 'complete', 'files_found': 100, 'files_scanned': 50}}}
+    monkeypatch.setattr(progress_agent, 'execute', lambda *a, **k: None)
+    monkeypatch.setattr(progress_agent, 'fetchone', lambda *a, **k:
+        {'last_change_at': now - timedelta(minutes=3), 'acquisition_recoveries': 0})
+    monkeypatch.setattr('app.services.job_locks.extract_celery_work_active', lambda *_: True)
+    events = []
+    monkeypatch.setattr(progress_agent, '_event', lambda db, jid, st, decision, reason: events.append((decision, reason)))
+
+    class DB:
+        def commit(self):
+            pass
+
+    result = progress_agent.inspect_acquisition_progress(DB(), job, schema_name='test', now=now)
+    assert result['status'] == 'valid_wait'
+    assert 'serial fallback' not in result['reason']
+    assert 'no duplicate extraction' in result['reason']
+    assert events and events[0][0] == 'valid_wait'
+
+
+def test_filter_reports_review_progress():
+    from types import SimpleNamespace
+    from app.services.extracted_disk import _filter_nodes
+    settings = SimpleNamespace(
+        extract_mode='full', extract_skip_system_paths=False,
+        extract_max_file_bytes=0, extract_uncertain_max_bytes=1024)
+    seen = []
+    nodes = [{'path': f'Users/A/note{i}.txt', 'size_bytes': 20} for i in range(3)]
+    kept, _stats = _filter_nodes(
+        nodes, settings, os_info={'family': 'windows'}, mode_override='full',
+        on_progress=lambda scanned, total: seen.append((scanned, total)))
+    assert len(kept) == 3
+    assert seen[0] == (1, 3) and seen[-1] == (3, 3)
+
+
 def test_agent_diagnoses_zero_progress_root_call():
     job={'pipeline_progress':{'extraction_activity':{'subphase':'enumerating',
          'files_found':0,'directories_scanned':0,'entries_scanned':0,

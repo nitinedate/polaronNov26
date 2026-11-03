@@ -1,6 +1,10 @@
 """The next evidence directory starts only after the current extract is saved."""
 
-from app.services.next_evidence_directory import pending_directories, restrict_to_next_directory
+from app.services.next_evidence_directory import (
+    lead_with_saved_image,
+    pending_directories,
+    restrict_to_next_directory,
+)
 
 
 def _files():
@@ -55,3 +59,23 @@ def test_follow_up_is_armed_before_the_next_pipeline_stage():
     assert phase3_fn.index("extract_pending_directories") < phase3_fn.index("_serial_handoff")
     serial_fn = serial.split("def start_serial_pipeline", 1)[1].split("def queue_for_stage", 1)[0]
     assert serial_fn.index("unfinished_directory_reason") < serial_fn.index("extraction_barrier")
+
+
+def test_saved_plan_stays_on_its_image_and_later_directories_follow():
+    groups = [
+        {"label": "Desktop 250GB", "paths": ["a.E01"], "directory": "/case/250"},
+        {"label": "Desktop 1TB", "paths": [f"b.E{i:02d}" for i in range(1, 4)], "directory": "/case/1tb"},
+        {"label": "Laptop", "paths": ["c.E01", "c.E02"], "directory": "/case/laptop"},
+    ]
+    ordered = lead_with_saved_image(groups, base_name="b", segment_count=3)
+    assert [item["directory"] for item in ordered] == ["/case/1tb", "/case/250", "/case/laptop"]
+
+
+def test_saved_first_directory_appends_every_later_directory_before_later_stages():
+    from pathlib import Path
+
+    disk = (Path(__file__).resolve().parents[1] / "app" / "services" / "disk.py").read_text(encoding="utf-8")
+    saved = disk.index("Directory 1 extraction saved")
+    appended = disk.index("extract_pending_directories", saved)
+    barrier = disk.index("Extraction barrier complete", appended)
+    assert saved < appended < barrier

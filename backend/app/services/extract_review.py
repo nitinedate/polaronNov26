@@ -208,6 +208,24 @@ def _human(n: int) -> str:
     return f"{n} B"
 
 
+def release_pending_review(db, job_id: str) -> bool:
+    """Let extraction continue when a review pause is blocking file copy.
+
+    Exclusions the examiner already chose stay in place. A pause that has not
+    been answered is released so the saved plan is copied instead of stopping
+    again with no checkpoint.
+    """
+    ds = _load_ds(db, job_id)
+    st = state(ds)
+    if not st.get("required") or st.get("status") == "approved":
+        return False
+    st["status"] = "approved"
+    st["released_at"] = datetime.now(timezone.utc).isoformat()
+    ds[REVIEW_KEY] = st
+    _save_ds(db, job_id, ds)
+    return True
+
+
 def gate(
     db,
     job_id: str,

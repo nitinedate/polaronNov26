@@ -474,6 +474,27 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
                     fetchone(db, "SELECT disk_source FROM jobs WHERE id=:job_id", {"job_id": job_id}) or {}
                 )
                 source_folders = list(initial_source.get("evidence_folders") or [])
+                # Registration of a later image can finish while this worker waits
+                # for a CPU lane. Read the roster again so that image is queued
+                # behind this one instead of being left out of the extract.
+                files = fetchall(
+                    db,
+                    "SELECT * FROM evidence_files WHERE job_id=:job_id ORDER BY original_name",
+                    {"job_id": job_id},
+                )
+                from app.services.job_control import load_extraction_checkpoint
+
+                saved_plan = load_extraction_checkpoint(db, job_id) or {}
+                if saved_plan.get("nodes_uri"):
+                    from app.services.next_evidence_directory import lead_with_saved_image
+                    from app.services.virtual_disk import list_image_directories
+
+                    ordered = lead_with_saved_image(
+                        list_image_directories(files, preferred_directories=source_folders),
+                        base_name=str(initial_source.get("base_name") or ""),
+                        segment_count=int(initial_source.get("segments") or 0),
+                    )
+                    source_folders = [group["directory"] for group in ordered]
                 files, directory_note = restrict_to_next_directory(files, directories=source_folders)
                 if directory_note:
                     first_source = str(Path(files[0]["host_path"]).parent) if files else ""
@@ -762,6 +783,40 @@ def _build_extracted_image_locked(db: Session, job_id: str, *, schema_name: str)
                 metadata={"axiom_platform": platform},
             )
             db.commit()
+            # Directory 2, 3, 4, … were not in this pass. Extract each one after
+            # the previous save and append its files onto the combined index
+            # before any later pipeline stage starts.
+            try:
+                from app.services.next_evidence_directory import extract_pending_directories
+
+                appended = extract_pending_directories(db, job_id, schema_name=schema_name)
+            except Exception as exc:
+                log.exception("later evidence directory was not appended job=%s", job_id)
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                write_disk_log(
+                    db,
+                    job_id,
+                    f"A later evidence directory was not appended onto the saved extract: {exc}. "
+                    "It will be retried before later stages.",
+                    stage="extract",
+                    level="warning",
+                )
+                db.commit()
+                appended = {"status": "waiting", "reason": str(exc)}
+            else:
+                if appended.get("status") == "extracted" and appended.get("directories"):
+                    write_disk_log(
+                        db,
+                        job_id,
+                        "Later directories were appended onto the first extract: "
+                        + ", ".join(str(name) for name in appended["directories"]),
+                        stage="extract",
+                        metadata={"appended_directories": appended.get("directories")},
+                    )
+                    db.commit()
             from app.forensic_common.pipeline_routing import should_continue_after_extract
             from app.service_identity import current_service, is_mobile_service
 

@@ -55,10 +55,18 @@ def _child(config_file: Path, result_file: Path) -> int:
             progress_interval_sec=float(plan.get("report_seconds") or 10),
             root_open_strategy=str(plan.get("root_open_strategy") or "inode"),
         )
+        total = len(nodes)
         with result_file.open("w", encoding="utf-8") as target:
-            for node in nodes:
+            for index, node in enumerate(nodes, start=1):
                 target.write(json.dumps(node, ensure_ascii=True, separators=(",", ":")) + "\n")
-        print(json.dumps({"kind": "done", "count": len(nodes)}), flush=True)
+                if index == total or index % 50000 == 0:
+                    target.flush()
+                    progress(
+                        f"Saving TSK inventory — {index:,} / {total:,} files",
+                        {"action": "tsk_inventory_serialize", "reader_phase": "complete",
+                         "files_scanned": index, "serialized": index},
+                    )
+        print(json.dumps({"kind": "done", "count": total}), flush=True)
         return 0
     finally:
         vd.close()
@@ -157,6 +165,8 @@ def enumerate_tsk_isolated(vd, *, on_progress=None, schema_name: str | None = No
                 reader_phase = "reopening_evidence"
                 last_native_call = "open_virtual_disk_from_paths"
                 last_read_offset = None
+                last_serialized = 0
+                last_result_size = -1
                 max_counts = (0, 0, 0)
                 done_count = None
                 next_stop_check = time.monotonic() + 10.0
@@ -167,6 +177,17 @@ def enumerate_tsk_isolated(vd, *, on_progress=None, schema_name: str | None = No
                         # entry, 420s repeated reads are wasteful. After entries
                         # begin, use the normal longer timeout for slow media.
                         timeout = root_idle if max_counts == (0, 0, 0) else idle
+                        # After the walk returns, the child writes the inventory
+                        # before it prints "done". A growing result file is
+                        # progress; killing it would repeat the finished walk.
+                        if reader_phase == "complete":
+                            try:
+                                result_size = nodes_path.stat().st_size
+                            except OSError:
+                                result_size = last_result_size
+                            if result_size > last_result_size:
+                                last_result_size = result_size
+                                last_useful = now
                         # A moving E01 offset means the root open is still reading
                         # metadata. Silence, not an active seek, is the stall.
                         offset_advancing = (
@@ -243,6 +264,10 @@ def enumerate_tsk_isolated(vd, *, on_progress=None, schema_name: str | None = No
                         if counts > max_counts:
                             max_counts = counts
                             last_useful = time.monotonic()
+                        serialized = int(metadata.get("serialized") or 0)
+                        if action == "tsk_inventory_serialize" and serialized > last_serialized:
+                            last_serialized = serialized
+                            last_useful = time.monotonic()
                         fingerprint = (counts, reader_phase)
                         if on_progress:
                             on_progress(str(event.get("message") or "TSK walk progress"), metadata)
@@ -250,9 +275,19 @@ def enumerate_tsk_isolated(vd, *, on_progress=None, schema_name: str | None = No
                     pump.join(timeout=2)
                     if code == 0 and done_count is not None and nodes_path.exists():
                         result = []
+                        loaded = 0
                         with nodes_path.open("r", encoding="utf-8") as source:
                             for line in source:
                                 result.append(json.loads(line))
+                                loaded += 1
+                                if on_progress and loaded % 50000 == 0:
+                                    on_progress(
+                                        f"Loading TSK inventory — {loaded:,} / {done_count:,} files",
+                                        {"action": "tsk_inventory_load", "reader_phase": "complete",
+                                         "files_scanned": loaded, "attempt": attempt,
+                                         "inventory_mode": inventory_mode,
+                                         "root_open_strategy": root_method},
+                                    )
                         if len(result) != done_count:
                             raise RuntimeError(f"TSK inventory count mismatch: read {len(result)} != {done_count}")
                         return result
